@@ -1,0 +1,837 @@
+# Implementation Plan — Maryville College RAG
+
+Companion to `PLAN.md` (the design doc). This file is the **execution** plan:
+ordered, verifiable tasks. `PLAN.md` says *what and why*; this says *in what
+order, and how you know it worked*.
+
+## Overview
+
+Build a cross-silo RAG chatbot over `maryvillecollege.edu` + the SmartCatalogIQ
+catalog, with a reproducible ablation harness. Generation runs on Ollama Cloud
+free tier (`gpt-oss:20b-cloud`); embedding and reranking run locally.
+
+## Architecture decisions carried in
+
+| Decision | Rationale | Ref |
+|---|---|---|
+| News sitemap excluded | ~850 dated posts; stale-date hallucination risk; doubles corpus | PLAN §1 |
+| SmartCatalogIQ needs a nav-tree adapter | robots permits it, but declares **no sitemap** | PLAN §1 |
+| Chunk cap 400 tok; sweep `(chunk_size, k)` coupled | embedder truncates at 512; the two trade off under a fixed context budget | PLAN §2c |
+| Retrieval ablations run before any generation | retrieval metrics cost zero quota | PLAN §2b, §4a |
+| Generation scored by a validated ladder | no frontier judge; self-judging is circular | PLAN §4d |
+| τ calibration method undecided — 3 candidates to test | cross-encoder scores aren't cross-query calibrated | PLAN §4e |
+| 40/20/40 stratified split, test touched once | τ and hyperparameters are fitted | PLAN Phase 2 |
+
+## Development conventions — OOP and Agile
+
+Two standing constraints, decided 2026-09-10. They bind every task below.
+
+### Object-oriented design
+
+Every pipeline stage is a **class behind an interface**, not a module of loose
+functions. The reason is not style: this project's whole experimental program is
+swapping one implementation for another and measuring the difference. An ablation
+should be a constructor argument, never an edited function body.
+
+| Seam | Abstract base | Implementations swapped in ablations |
+|---|---|---|
+| Retrieval leg | `Retriever.search(query, k) -> list[Hit]` | dense, BM25, literal/regex |
+| Fusion | `Fuser.fuse(list[list[Hit]]) -> list[Hit]` | RRF, weighted, MoR |
+| Reranking | `Reranker.rerank(query, hits) -> list[Hit]` | cross-encoder, identity (off) |
+| Chunking | `Chunker.chunk(Document) -> list[Chunk]` | heading-aware, fixed-window |
+| Extraction | `Extractor.extract(RawPage) -> Document` | trafilatura, fallback |
+| Generation | `Generator.generate(Prompt) -> Iterator[Event]` | cloud model, stub, cached replay |
+| Query rewriting | `Reformulator.reform(query, history) -> list[str]` | each rung of the ladder |
+| Scoring | `Scorer.score(Answer, Gold) -> Score` | Tier 0–3 of the ladder |
+
+Rules that follow from this:
+
+- **`config.yaml` names classes.** The runner instantiates from the config; adding
+  an ablation arm means adding a class and a config value, not a branch.
+- **Value objects are frozen dataclasses** — `Hit`, `Chunk`, `Document`, `Score`,
+  `Event`. Nothing downstream mutates what it was handed.
+- **Composition over inheritance below the interface.** The base classes exist to
+  define a contract; a two-level hierarchy is a smell, not a design.
+- **No I/O in constructors.** Index loading, HTTP clients and model handles are
+  injected, so every stage is testable with a fake.
+- **The service layer depends on interfaces only** (T24) — the existing rule that
+  no web framework may be imported there is the same rule stated narrowly.
+
+An abstract base with exactly one implementation and no ablation planned against
+it is over-engineering; write the concrete class and extract the interface when
+the second implementation actually arrives.
+
+### Agile process
+
+Solo project, so the ceremony that assumes a team is dropped and the mechanics
+that do real work are kept.
+
+| Agile concept | What it is here |
+|---|---|
+| Product backlog | `tasks/todo.md` — ordered, re-ordered freely, nothing starts without criteria |
+| Sprint | The span between two checkpoints; **Checkpoints A–H are the sprint boundaries** |
+| Increment | Each checkpoint ships something demonstrable and reviewed, not a half-integrated branch |
+| Definition of done | The task's acceptance criteria **plus** its verification step passing |
+| Sprint review | The checkpoint's own review gate; Checkpoint D is a real GO/NO-GO |
+| Retrospective | The dated `## Resolved` block at the foot of this file |
+| Velocity | Not tracked. A solo velocity number measures nothing |
+| Standup, planning poker, story points | Dropped |
+
+Rules that follow:
+
+- **Vertical slices, not horizontal layers.** Prefer a thin end-to-end path that
+  answers one question badly over a perfect crawler with nothing behind it. This
+  is why T16 is an end-to-end sanity check placed before the tuning work.
+- **Working software at every checkpoint.** If a checkpoint cannot be
+  demonstrated, it is not done, regardless of how much code exists.
+- **The backlog is re-orderable; the frozen artifacts are not.** Pre-registered
+  analysis plans (T16b), `corpus.lock`, `split.lock` and the Checkpoint E config
+  are deliberately outside the agile surface. Responding to change does not
+  extend to changing the metric after seeing the result.
+- **Refactor continuously, inside a checkpoint.** Interfaces get extracted when
+  the second implementation arrives, not speculatively before it.
+
+## Dependency graph
+
+```
+T1 config+run-log ──┬── T2 robots+ratelimit ── T4 manifest ── T5 fetcher ── T6 extract
+                    │                                          │
+                    │                        T7 catalog adapter ┘
+                    │                                          │
+                    │                          T8 silo mapper ──┤
+                    │                                          v
+                    │                                   T9 chunker ── T10 incremental
+                    │                                          │
+                    └── T3 quota calibration                   v
+                                                        T11 indexes
+                                                               │
+              T12 gold schema+splits ── T13 gold authoring      │
+                                    └──────────┬───────────────┘
+                                               v
+                                    T14 retrieval eval harness
+                                               │
+                                    T15 Phase 3a baseline
+                                               │
+                                    T16 Phase 3b sanity  <-- RISK GATE
+                                               │
+                                    T16b analysis plan (pre-registered)
+                                               │
+                                    T17 ablation runner
+                                               │
+                                    T18 free retrieval ablations
+                                               │
+                          T19 scoring ladder ──┤
+                                               v
+                                    T20 Phase 3c gen baseline
+                                               │
+                                    T21 τ study ── T22 metered ablations
+                                               │
+                                               v   [Checkpoint E — config frozen]
+                                    T23 event contract
+                                               │
+                                    T24 service callable (no web framework)
+                                               │
+                                    T25 FastAPI+SSE shell
+                                               │
+                          ┌────────────────────┼────────────────────┐
+                          v                    v                    v
+                   T26 early sources    T29 ref client       T27 refusal routing
+                          │                                         │
+                          └─────────────────┬───────────────────────┘
+                                            v
+                                   T28 conversation memory
+                                            │
+                                            v   [Checkpoint F — backend done]
+                          T30 results table ── T31 README ── T32 limitations
+                                    │                     └── T33 demo
+                                    v   [Checkpoint G — shipped]
+                          T34 re-crawl + alerts ── T35 gold staleness
+                                    └── T36 re-run trigger
+```
+
+**T8 also depends on T4**, not only T6: silo discovery step 1 is a path-prefix
+histogram over the manifest.
+
+---
+
+# Phase 0 — Foundations
+
+## Task 1: Config schema + run-logging harness
+
+**Description:** The spine everything else writes to. One `config.yaml` fully
+describes a pipeline; one run directory captures a result with its provenance
+locks.
+
+**Acceptance criteria:**
+- [ ] `config.yaml` round-trips to a typed object; unknown keys are an error
+- [ ] Config **names implementation classes** per seam; the runner instantiates from the config with no `if` on arm names
+- [ ] `runs/<ts>_<confighash>/` created with `config.yaml`, `metrics.json`, `per_query.jsonl`, `corpus.lock`, `model.lock`, `split.lock`, `notes.md`
+- [ ] Run id = timestamp + config hash; identical configs produce identical hashes
+- [ ] `per_query.jsonl` is appended incrementally and a killed run leaves a valid resumable file
+
+- [ ] Frozen dataclasses defined for `Hit`, `Chunk`, `Document`, `Score`, `Event`; mutation raises
+
+**Verification:** `pytest tests/test_runlog.py`; kill a run mid-write and confirm the partial file parses line-by-line. Assert a config naming a fake class instantiates it without touching runner code.
+
+**Dependencies:** None · **Scope:** M
+
+## Task 2: Robots enforcement + rate limiter
+
+**Description:** The two load-bearing crawl rules, as code. The separate policy
+document is dropped — it becomes three lines in the README (§1). The robots
+parser is needed anyway to discover sitemaps, so enforcement is nearly free.
+
+**Acceptance criteria:**
+- [ ] Robots parser refuses any URL matching a `Disallow`, and **returns the matched rule string** for the manifest `reason` field
+- [ ] Rate limiter measurably holds ≤1 req/sec across concurrent callers
+- [ ] UA string with a contact address is set from config, and a request without one fails loudly
+- [ ] Unit test asserts each of the five known WordPress disallow paths is rejected
+- [ ] README carries the three-line policy statement
+
+**Verification:** `pytest tests/test_robots.py`; timing test over 10 queued URLs takes ≥10s.
+
+**Dependencies:** None · **Scope:** S
+
+## Task 3: Ollama Cloud smoke test + quota calibration
+
+**Description:** Empirical, not a decision. Establishes the budget every later
+phase is designed around. **Do this early — it is the project's largest unknown.**
+
+**Acceptance criteria:**
+- [ ] Authenticated call to `gpt-oss:20b-cloud` returns text
+- [ ] `num_ctx` set explicitly; a prompt exceeding it raises rather than truncating silently
+- [ ] Reasoning channel parsed and separated from visible answer
+- [ ] 20 sample questions run; `eval_duration` / `prompt_eval_duration` recorded per query
+- [ ] `docs/quota-calibration.md` states seconds/query and derived **full gold-set passes affordable per weekly reset**
+
+**Verification:** Manual review of the calibration doc. Confirm whether cloud returns duration fields at all; if not, record that client wall-clock is the fallback.
+
+**Dependencies:** None · **Scope:** S
+
+### ✅ Checkpoint A
+- [ ] Run harness writes complete, resumable run dirs
+- [ ] Robots enforcement passes tests
+- [ ] Quota budget is a written number, not an assumption
+- [ ] **Human review before building the crawler**
+
+---
+
+# Phase 1 — Corpus
+
+## Task 4: Sitemap parser → crawl manifest
+
+**Description:** Build `corpus/manifest.jsonl` as **one record per URL
+considered, not per URL fetched** (§1). A corpus that records only its successes
+cannot tell you what is missing from it.
+
+**Acceptance criteria:**
+- [ ] Parses the two in-scope WordPress sitemaps; **news sitemap excluded by config, not by omission**
+- [ ] Every URL considered gets a record with `status` ∈ `fetched` / `excluded` / `failed` / `skipped`
+- [ ] **Every non-`fetched` record carries a class-prefixed `reason`**: `robots_disallow:<rule>` · `policy:<name>` · `http_error` · `extraction_empty` · `unchanged_hash`. A bare "excluded" fails review
+- [ ] Excluded URLs stay *in* the manifest — exclusion is recorded, not silent
+- [ ] `lastmod` recorded but flagged untrusted (documented: 2017 post carries a 2026 lastmod)
+- [ ] Every URL passes the Task 2 robots check before fetch is attempted
+- [ ] `scripts/coverage.py` reports counts by status and by reason class
+
+**Verification:** Manifest count is 800–900 for pages; zero `/news/` URLs with
+status `fetched`; ~850 present with `policy:news_excluded`. Coverage report
+totals reconcile against sitemap URL count exactly.
+
+**Dependencies:** T2 · **Scope:** M
+
+## Task 5: Polite fetcher + raw snapshot store
+
+**Acceptance criteria:**
+- [ ] Fetches manifest URLs at ≤1 req/s with the policy UA
+- [ ] Stores raw HTML content-hashed and dated; re-fetch of unchanged page creates no duplicate
+- [ ] Resumable — interrupting and restarting does not refetch completed URLs
+- [ ] Failures logged with status codes; run does not abort on a single 404
+
+**Verification:** Two consecutive full runs; second completes with ~0 new snapshots written.
+
+**Dependencies:** T4 · **Scope:** M
+
+## Task 6: Extraction + regression snapshot test
+
+**Acceptance criteria:**
+- [ ] `trafilatura` extraction produces main content with nav/footer chrome removed
+- [ ] 20 hand-picked pages (one per silo) have committed expected-text snapshots
+- [ ] Extraction regression test fails loudly on drift
+- [ ] Empty or suspiciously short extractions are flagged, not silently kept
+
+**Verification:** `pytest tests/test_extraction_snapshots.py`; manually confirm 3 extractions contain no nav text.
+
+**Dependencies:** T5 · **Scope:** M
+
+## Task 7: SmartCatalogIQ nav-tree crawler adapter
+
+**Description:** Different platform, different DOM, **and no sitemap** — URLs
+must be discovered by walking the catalog navigation tree.
+
+**Acceptance criteria:**
+- [ ] Catalog footer checked for terms of use; finding recorded in `decisions/`
+- [ ] Nav-tree walk discovers all 13 sections without blind recursion
+- [ ] `/sitecore/` never requested
+- [ ] **Discovered URLs enter the same `manifest.jsonl` with `source: "catalog-nav"`** — one corpus accounting, not two
+- [ ] `catalog_year` stamped on every extracted page
+- [ ] Extraction snapshot test extended with 5 catalog pages
+
+**Verification:** Discovered URL count matches manual section count; snapshot tests pass.
+
+**Dependencies:** T2, T6 · **Scope:** M
+
+## Task 8: Silo discovery, mapper, and contact-routing table
+
+**Description:** Runs the four-step discovery procedure in §2c. **Absorbs the
+former T8b** — the contact table is a byproduct of step 3, not follow-on work,
+and treating it as separate is what let it go missing.
+
+The governing test: *a silo is a topic that has an office with a published
+contact page.* If you cannot name an owner with an email, it is a topic, not a
+silo.
+
+**Acceptance criteria:**
+- [ ] Step 1 — path-prefix histogram over the manifest, with page counts, committed as data
+- [ ] Step 2 — top nav and breadcrumb trails harvested; **nav/URL disagreements recorded**, not silently resolved
+- [ ] Step 3 — each candidate matched against the staff/office directory; match promotes to silo **and emits a contact row**
+- [ ] `data/silos.yaml` (taxonomy) and `data/offices.yaml` (name → contact URL + email) both exist and are data, not code
+- [ ] Every non-`other` silo has an offices row. **A silo without a contact is a failed match and must fold or be marked ownerless**
+- [ ] Mapper assigns **multi-label** silos from path + breadcrumb
+- [ ] `other` rate measured and reported; **>10% means the mapper is broken, not the site** → revise
+- [ ] Granularity follows the site: a division is its own silo iff it has its own contact page
+- [ ] Final taxonomy + the rationale committed to `decisions/`
+
+**Verification:** Sample ~10 URLs per silo, hand-check assignments, record
+accuracy. Assert every silo in `silos.yaml` except `other` resolves to a row in
+`offices.yaml`. Spot-check three contact URLs are live.
+
+**Dependencies:** T4, T6 · **Scope:** M
+
+## Task 9: Heading-aware chunker + metadata stamping
+
+**Acceptance criteria:**
+- [ ] Chunks respect H2/H3 boundaries; cap 400 tokens, ~15% overlap
+- [ ] **No chunk exceeds the embedder's 512-token limit** (asserted, not assumed)
+- [ ] Every chunk carries: `source_url`, `title`, `breadcrumb`, `silo`, `heading_path`, `crawled_at`, `content_hash`, `catalog_year`
+- [ ] `chunk_size` and overlap are config-driven for the §2c sweep
+
+**Verification:** Assert max token length over the full corpus; spot-check 10 chunks for coherent heading paths.
+
+**Dependencies:** T8 · **Scope:** M
+
+## Task 10: Incremental reindex
+
+**Acceptance criteria:**
+- [ ] Content-hash diff identifies changed pages; `lastmod` used only as a cheap pre-filter
+- [ ] Changed page → delete-by-`source_url` → re-insert; no orphaned chunks
+- [ ] Unchanged corpus produces a no-op reindex
+- [ ] `corpus.lock` written with the snapshot hash
+
+**Verification:** Mutate one snapshot, rerun, confirm only that page's chunks change.
+
+**Dependencies:** T9 · **Scope:** M
+
+## Task 11: Build the three indexes
+
+**Acceptance criteria:**
+- [ ] LanceDB dense index over `bge-base-en-v1.5` embeddings
+- [ ] BM25 index over the same chunk set
+- [ ] Literal index supporting substring/regex with the §4c entity patterns
+- [ ] Embeddings cached on `(model_name, chunk_text_hash)`; rebuild with unchanged chunks re-embeds nothing
+- [ ] All three return chunk ids joinable to metadata
+
+**Verification:** Query all three with a known course code; confirm the literal index returns exact hits.
+
+**Dependencies:** T9 · **Scope:** M
+
+### ✅ Checkpoint B
+- [ ] Full corpus crawled, extracted, chunked, indexed
+- [ ] Extraction snapshots pass; silo `other` rate acceptable
+- [ ] No chunk exceeds 512 tokens
+- [ ] **Human review of 20 random chunks for quality before building the gold set**
+
+---
+
+# Phase 2 — Gold set
+
+## Task 12: Gold-set schema + split tooling
+
+**Description:** Build the container before writing 300 questions into it.
+Retrofitting granularity or conjunctive flags later is miserable.
+
+**Acceptance criteria:**
+- [ ] Schema: `qid`, `slice`, `question`, `gold` (list of **heading/chunk-level** refs, not bare page URLs), `conjunctive: bool`, `notes`
+- [ ] Stratified 40/20/40 split, deterministic from a seed, proportional within every slice
+- [ ] `split.lock` records split hash and which split a run scored
+- [ ] Test-access counter that must be incremented explicitly
+
+**Verification:** Re-running the splitter with the same seed produces an identical split hash.
+
+**Dependencies:** T1 · **Scope:** M
+
+## Task 13: Author the gold set (~300 questions)
+
+**Description:** The largest manual effort in the project. Slice quotas
+proportional to PLAN Phase 2, scaled to 300.
+
+**Acceptance criteria:**
+- [ ] ~300 questions across all six slices at target proportions
+- [ ] Every answerable question has heading-level gold refs
+- [ ] Cross-silo questions marked `conjunctive: true` and reference ≥2 silos
+- [ ] Out-of-scope slice has no gold refs and is explicitly unanswerable from the corpus
+- [ ] Authored against **train+dev only** — do not read test questions while tuning later
+
+**Verification:** Schema validation passes; sample 20 and confirm gold refs actually contain the answer.
+
+**Dependencies:** T12, T11 · **Scope:** L — *split by slice across sessions*
+
+### ✅ Checkpoint C
+- [ ] 300 questions validated, split, locked
+- [ ] Gold refs verified on a 20-question sample
+- [ ] **Human review — this dataset is the measuring instrument for everything after**
+
+---
+
+# Phase 3 — Baselines
+
+## Task 14: Retrieval eval harness (zero quota)
+
+**Acceptance criteria:**
+- [ ] Computes recall@k, MRR, nDCG against gold refs
+- [ ] Computes **all-golds-retrieved@k** for `conjunctive` questions — partial recall scores zero
+- [ ] Runs the full gold set in seconds, no LLM calls
+- [ ] Writes a standard run dir (T1)
+
+**Verification:** Hand-compute metrics for 3 questions and match the harness output exactly.
+
+**Dependencies:** T11, T12 · **Scope:** M
+
+## Task 15: Phase 3a retrieval baseline
+
+**Acceptance criteria:**
+- [ ] Deliberately naive config: fixed 512-tok chunks, dense-only, k=5, no literal leg, no rerank, no rewriting
+- [ ] Scored on **dev**; run dir committed as the control condition
+- [ ] `RESULTS.md` generated from `runs/` as a leaderboard
+
+**Verification:** Baseline numbers are plausible and reproducible across two runs.
+
+**Dependencies:** T14 · **Scope:** S
+
+## Task 16: Phase 3b end-to-end sanity check ⚠️ RISK GATE
+
+**Description:** Validates that retrieval metrics predict answer quality
+*before* twenty ablations are tuned against them.
+
+**Acceptance criteria:**
+- [ ] 25 dev questions run end-to-end on the 3a config
+- [ ] Answers **hand-scored 0/1/2** — no LLM judge at this n
+- [ ] Disagreement quadrants analysed per PLAN Phase 3b
+- [ ] `num_ctx` truncation explicitly ruled out
+- [ ] **Primary retrieval metric chosen empirically** and recorded in `decisions/`
+
+**Verification:** Written finding stating which metric tracks hand-scored quality, with the quadrant table.
+
+**Dependencies:** T15, T3 · **Scope:** M
+
+## Task 16b: Pre-registered analysis plan + statistics tooling
+
+**Description:** Implements PLAN §4f. Must be **complete and committed before the
+first Phase 4 run**, because its entire purpose is to make Phase 4 confirmatory
+rather than a search for a story. Written after seeing results, it is worthless.
+
+**Acceptance criteria:**
+- [ ] `decisions/analysis-plan.md` names the primary retrieval, generation and abstention metrics — the retrieval one carried over from the T16 finding and **frozen here**
+- [ ] It lists the specific comparisons the test split will be spent on; anything else is labelled exploratory when reported
+- [ ] Paired comparison utilities: **exact McNemar** for binary outcomes, **seeded paired bootstrap** (10k) for graded ones and for median cost
+- [ ] Every metric function returns `(point_estimate, ci_low, ci_high, n)` — **a bare float is not an acceptable return type anywhere in the harness**
+- [ ] `scripts/mde.py` reproduces the §4f detectable-effect table
+- [ ] Reporting layer refuses to emit a p-value for any dev-split comparison
+
+**Verification:** Round-trip a known-effect synthetic pair through both tests and
+confirm the CI covers the truth at the nominal rate. Assert the reporting layer
+raises on a dev p-value request.
+
+**Dependencies:** T16 · **Scope:** M
+
+### 🚨 Checkpoint D — GO / NO-GO
+- [ ] Retrieval proxy demonstrably tracks answer quality
+- [ ] If it does not: **stop and fix the metric or the gold labels before Phase 4**
+- [ ] **Human review — this gate protects all downstream work**
+
+---
+
+# Phase 4 — Ablations
+
+## Task 17: Ablation runner (resumable, cached)
+
+**Acceptance criteria:**
+- [ ] Takes a config matrix, runs one variable at a time, one run dir each
+- [ ] Generation cache keyed `(model, digest, prompt_hash)`; identical reruns cost zero quota
+- [ ] Resume from last completed `qid` after interruption
+- [ ] Quota wall → clean pause with resumable state, never a corrupt run
+
+**Verification:** Kill mid-sweep, resume, confirm no duplicate generations and identical final metrics.
+
+**Dependencies:** T1, T14 · **Scope:** M
+
+## Task 18: Free retrieval ablations — **factorial, not OFAT** (#1–#5, #7)
+
+**Description:** These runs cost nothing, so the only thing OFAT would buy is a
+blind spot on interactions. Run the full crossing (PLAN §Phase 4).
+
+**Acceptance criteria:**
+- [ ] **Index-time factors crossed:** boilerplate on/off × chunking scheme → 4 index builds
+- [ ] **Query-time factors crossed:** reranker × fusion mode × silo boost → 8 configs per index
+- [ ] All 32 cells evaluated; **`k` swept nested within a cell**, not as an orthogonal factor (the `(chunk_size, k)` coupling makes it non-orthogonal — §2c)
+- [ ] **Two-way interactions estimated and reported**, not just main effects
+- [ ] Every run logged with `corpus.lock` + `split.lock`, scored on dev
+- [ ] Zero generation calls across the entire set
+- [ ] Retrieval config frozen and recorded in `decisions/` at the end
+
+**Verification:** `RESULTS.md` carries a main-effects table **and** an
+interaction table; cell count is exactly 32; quota consumption is exactly zero.
+
+**Dependencies:** T17, Checkpoint D · **Scope:** L
+
+## Task 19: Generation scoring ladder
+
+**Acceptance criteria:**
+- [ ] Tier 0 deterministic metrics implemented (citation accuracy/validity, refusal correctness, exact-match regex)
+- [ ] Tier 1 NLI faithfulness via local DeBERTa-class entailment model
+- [ ] If a Tier 3 judge is used: different model, **temperature 0**, calibrated against the Task 16 hand-scores, **κ reported**
+- [ ] Uncalibrated judge output is never reported as a metric
+
+**Verification:** Tier 0 metrics hand-verified on 5 answers; judge κ recorded if used.
+
+**Dependencies:** T16 · **Scope:** M
+
+## Task 20: Phase 3c generation baseline
+
+**Acceptance criteria:**
+- [ ] Naive prompt (no forced citations, no abstention) on frozen retrieval, dev split
+- [ ] Scored with the Task 19 ladder
+- [ ] Committed as the control for #6, #8, #9, #10
+
+**Verification:** Reproducible across two runs at temperature 0.
+
+**Dependencies:** T18, T19 · **Scope:** S
+
+## Task 21: τ calibration study
+
+**Acceptance criteria:**
+- [ ] All three candidates tested: per-query normalisation, top1−top2 margin, percentile
+- [ ] Correct/false-refusal curve computed **offline from stored retrieval scores** (near-zero quota)
+- [ ] Model-initiated refusals measured separately from threshold-gated ones
+- [ ] Chosen method and rationale recorded in `decisions/`
+
+**Verification:** Tradeoff curves plotted for all three; selection justified against the curve.
+
+**Dependencies:** T20 · **Scope:** M
+
+## Task 22: Metered ablations (#6, #8, #9, #10)
+
+**Acceptance criteria:**
+- [ ] Query reformulation ladder, citation-forced vs free-form prompting, τ sweep, model comparison
+- [ ] All run on **dev**, never test
+- [ ] **Runs interleaved by question, never by config** — sequential arms confound config with hosted-weight drift (§Phase 4). The runner emits an interleaved work queue, and this is asserted, not left to discipline
+- [ ] `model.lock` digest re-checked mid-sweep; a change quarantines affected questions rather than the whole run
+- [ ] OFAT here is a **quota decision, recorded as such** in `decisions/`, not a design preference
+- [ ] Quality **and** cost logged per run; results presented as a Pareto frontier
+- [ ] Quota consumption tracked against the Task 3 budget
+
+**Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
+recorded; work-queue order test confirms no two consecutive items share a config.
+
+**Dependencies:** T20, T21 · **Scope:** L
+
+### ✅ Checkpoint E — before touching test
+- [ ] Full config frozen
+- [ ] Every ablation logged and reproducible
+- [ ] **Test split evaluated exactly once, after this checkpoint**
+
+---
+
+---
+
+# Phase 5 — Product backend (UI deliberately deferred)
+
+**Governing constraint: no client is privileged.** The front end is undecided —
+embeddable widget on another site, standalone site, or something else. That stays
+deferrable only if nothing in the service knows what renders it. Cheap to honor
+now, expensive to retrofit. See PLAN.md §Phase 5 for the contract.
+
+## Task 23: Event schema + stream contract
+
+**Description:** Define the contract *before* the code, because a second client
+turns it into a public interface the moment it exists.
+
+**Acceptance criteria:**
+- [ ] `docs/stream_contract.md` defines events `sources` · `token` · `citation` · `refusal` · `done` with full field lists
+- [ ] Schema is versioned (`v1`) and the version travels in the `done` event
+- [ ] `citation` carries character spans into the answer text, so clients never re-parse prose
+- [ ] `refusal` carries office, contact URL and email as **structured fields** — no client parses an apology to find an email
+- [ ] Pydantic models generated from / matching the doc, one source of truth
+
+**Verification:** Round-trip every event type through the models; doc and models diff clean in CI.
+
+**Dependencies:** T22 (config frozen) · **Scope:** S
+
+## Task 24: Answer service callable
+
+**Description:** `answer(question, history) -> Iterator[Event]`. **No web
+framework imported anywhere in this module.** This is what makes the API a thin
+shell and the UI genuinely optional — it is importable from a script, a test, or
+a notebook.
+
+**Acceptance criteria:**
+- [ ] Runs the frozen Checkpoint-E config end to end
+- [ ] Yields typed events per T23, in contract order
+- [ ] `import fastapi` does not appear in the module or its imports (asserted by test)
+- [ ] Same code path used by the eval harness, so product and experiment cannot drift
+- [ ] Per-stage latency captured and attached to `done`
+
+**Verification:** `pytest tests/test_service.py` drives it with no server running. Grep asserts no framework import.
+
+**Dependencies:** T23 · **Scope:** M
+
+## Task 25: FastAPI + SSE shell
+
+**Acceptance criteria:**
+- [ ] `POST /ask` streams the T24 events as SSE, thin by construction — no logic beyond transport
+- [ ] CORS configurable by origin allowlist
+- [ ] Simple API token check, config-driven
+- [ ] Client disconnect cancels the upstream generation call rather than burning quota to nobody
+- [ ] `GET /health` reports index build id and corpus hash
+
+**Verification:** `curl -N` against a live server shows correctly framed events; disconnect test confirms cancellation.
+
+**Dependencies:** T24 · **Scope:** M
+
+## Task 26: Early `sources` emission + freshness
+
+**Description:** The single most important behavior in the contract. Generation
+TTFT is the entire reasoning phase, potentially 10s+ of blank screen (§4b).
+Emitting sources at rerank time lets *any* client fill that gap with the trust
+surface instead of a spinner — widget, site and terminal all get it free.
+
+**Acceptance criteria:**
+- [ ] `sources` is emitted **before the first generation token is requested**, not merely before the first token is yielded
+- [ ] Each source carries `title`, `url`, `silo`, `heading_path`, `rerank_score`, `last_verified`
+- [ ] Staleness flag computed from `crawled_at` against a configurable threshold
+- [ ] Measured gap between `sources` and first `token` is logged — it is the UX number this whole design exists to fill
+
+**Verification:** Timing test asserts `sources` arrives at least 1s before first `token` on a reasoning-heavy question.
+
+**Dependencies:** T25 · **Scope:** S
+
+## Task 27: Refusal path + office routing
+
+**Acceptance criteria:**
+- [ ] Threshold, answerability gate and model-initiated refusal all wired, with **any-signal-wins** precedence (§4e)
+- [ ] All three signals plus the resolved winner logged per request
+- [ ] Refusal resolves the owning office via `data/offices.yaml` (T8) and emits contact fields
+- [ ] Unroutable refusal falls back to a general contact rather than emitting an empty office
+
+**Verification:** Force each of the three pathways in a test; assert precedence and a populated contact on every refusal.
+
+**Dependencies:** T26, T8, T21 · **Scope:** M
+
+## Task 28: Conversation memory + follow-up rewriting
+
+**Description:** The mechanism the ~15-question multi-turn gold slice measures.
+
+**Acceptance criteria:**
+- [ ] History accepted per-request; server holds no session state it cannot rebuild
+- [ ] De-contextualization rewrites a follow-up into a standalone query before retrieval (§4c step 5)
+- [ ] `rewritten_query` is visible in the response payload and in logs — silent rewriting is undebuggable
+- [ ] Evaluated against the multi-turn slice; **result reported even if it is bad**
+
+**Verification:** Run the multi-turn dev slice through it; compare recall against feeding the raw follow-up.
+
+**Dependencies:** T27 · **Scope:** M
+
+## Task 29: Reference client (disposable)
+
+**Description:** ~40 lines of HTML/JS whose only jobs are proving the stream
+works and demoing. **A test fixture, not a product.** When the real front end is
+decided it is a new client against a frozen contract.
+
+**Acceptance criteria:**
+- [ ] Renders every event type, sources first
+- [ ] Inline citation links to live source URLs
+- [ ] Refusal renders the office contact
+- [ ] File header states plainly that it is disposable, so nobody grows a product on it
+
+**Verification:** Manual — ask three questions including one refusal.
+
+**Dependencies:** T26 · **Scope:** S
+
+### ✅ Checkpoint F — backend complete
+- [ ] Contract frozen and documented; a second client could be written from the doc alone
+- [ ] Service callable runs with no server
+- [ ] Sources-before-tokens verified by timing test
+- [ ] Refusal always routes to a real office
+- [ ] **No UI decision has been made or needed**
+
+---
+
+# Phase 6 — Portfolio
+
+## Task 30: Results table generator
+
+**Acceptance criteria:**
+- [ ] `RESULTS.md` regenerated from `runs/` — never hand-edited
+- [ ] Every row carries n, split, and cost alongside quality
+- [ ] Baseline rows (3a / 3b / 3c) marked as controls
+- [ ] Quality/cost Pareto frontier plotted (§4b)
+
+**Verification:** Delete and regenerate; output is byte-identical.
+
+**Dependencies:** T22 · **Scope:** M
+
+## Task 31: Architecture diagram + README
+
+**Acceptance criteria:**
+- [ ] Offline ingest and online query paths both drawn
+- [ ] Three-line crawl policy statement present (T2)
+- [ ] Corpus coverage numbers cited from the manifest (T4), not estimated
+- [ ] Setup instructions actually followed on a clean checkout
+
+**Dependencies:** T30 · **Scope:** S
+
+## Task 32: Limitations + writeup
+
+**Acceptance criteria:**
+- [ ] Self-authored eval set, author-is-designer blind spots, cloud attributability-not-reproducibility, single-model abstention — each stated plainly, **not buried in footnotes**
+- [ ] Judge-human agreement number reported if a Tier 3 judge was used (§4d)
+- [ ] Test-split access log reproduced verbatim
+- [ ] What actually moved the numbers, including what did not
+
+**Dependencies:** T30 · **Scope:** M
+
+## Task 33: Recorded demo walkthrough
+
+**Acceptance criteria:**
+- [ ] Covers a single-silo question, a cross-silo question, and a refusal that routes
+- [ ] Sources-render-before-answer behavior visible on camera
+- [ ] Recorded, not a live deploy — Phase 5 is local unless the public checklist is done
+
+**Dependencies:** T29, T31 · **Scope:** S
+
+### ✅ Checkpoint G — shipped
+- [ ] `RESULTS.md` generated, limitations written, demo recorded
+- [ ] Ablation table is the centerpiece, not the demo
+
+
+---
+
+# Phase 7 — Maintenance
+
+Development ends; the college's website does not. This phase is **a cron job and
+four alerts** (PLAN §Phase 7). It is not an ops practice: no dashboards, no
+uptime SLO, no on-call rotation, no retraining loop.
+
+## Task 34: Scheduled re-crawl + the four alerts
+
+**Description:** One scheduled job that re-runs crawl → extract → manifest →
+incremental reindex, and shouts when any of the four decay modes fires. Silence
+is the success condition.
+
+**Acceptance criteria:**
+- [ ] Single entry point runs the whole ingest chain unattended and exits non-zero on failure
+- [ ] Alert 1 — **extraction regression**: any pinned snapshot page (T6) whose extracted text changes shape, or goes empty on an HTTP 200
+- [ ] Alert 2 — **corpus shape drift**: new 404s on previously-fetched URLs, or the manifest `other`-silo rate crossing 10%
+- [ ] Alert 3 — **volume anomaly**: fetched-page count moving more than a set fraction versus the last run, in either direction
+- [ ] Alert 4 — **stale gold** (T35): any gold question whose source `content_hash` changed
+- [ ] Every run appends a dated row to a maintenance log; **no row is ever deleted or edited**
+- [ ] An alert is a written record plus a non-zero exit, not a notification service
+
+**Verification:** Force each of the four conditions against a fixture corpus and
+confirm each fires independently and names the offending URLs.
+
+**Dependencies:** T6, T10, T35 · **Scope:** M
+
+## Task 35: Gold-set decay — content-hash pinning and stale accounting
+
+**Description:** The decay mode that degrades *measurements* rather than the
+product, and the only one invisible from the outside. A gold answer keyed to a
+page the college has since rewritten is silently wrong, and every metric
+computed against it is silently wrong too.
+
+**Acceptance criteria:**
+- [ ] Every gold reference carries the `content_hash` of the page it was read from, written at authoring time (amends T12/T13)
+- [ ] A changed hash marks the question `stale`; stale questions are **excluded from metrics until a human re-reads the page**
+- [ ] The **stale count is itself reported** on every results table — a shrinking denominator is a different metric, not the same one measured better
+- [ ] Re-verification updates the pin and records who re-read it and when
+- [ ] Stale-marking never edits or deletes the original question text
+
+**Verification:** Mutate a fixture page, re-run, and confirm the affected
+questions drop out of the metric and appear in the stale count with their URLs.
+
+**Dependencies:** T12, T13, T30 · **Scope:** M
+
+## Task 36: Re-run trigger and result versioning
+
+**Description:** Decides *when* the published numbers stop being true.
+
+**Acceptance criteria:**
+- [ ] Trigger fires when >10% of pages have changed since the `corpus.lock` behind `RESULTS.md`, or when any T34 alert is open
+- [ ] A fired trigger re-runs the frozen Checkpoint-E config only — **not a new tuning round**; re-tuning is a decision, not a maintenance action
+- [ ] New numbers are added to `RESULTS.md` as a dated row against the new `corpus.lock`; **old rows stay**
+- [ ] The test split is not re-spent by maintenance re-runs; any re-use is logged in the test-split access log
+
+**Verification:** Simulate a 12% corpus change and confirm the trigger fires, the
+re-run reuses the frozen config, and both rows survive regeneration.
+
+**Dependencies:** T30, T34 · **Scope:** S
+
+### ✅ Checkpoint H — maintenance mode
+- [ ] One scheduled job covers all four decay modes
+- [ ] Stale gold is measured and reported, not quietly dropped
+- [ ] Nothing here requires a human unless an alert fires
+
+## Risks
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Retrieval proxy doesn't track answer quality | **High** | Checkpoint D gate (T16) before any tuning |
+| Quota exhausts mid-sweep | Med | T17 resumability; free ablations first; T3 budget known up front |
+| Gold labels too coarse to score cross-silo | **High** | Heading-level refs + conjunctive flags decided in T12, before authoring |
+| Silo taxonomy doesn't fit the real IA | Med | `other` rate measured in T8; >10% triggers revision |
+| Extraction silently degrades after a site reskin | Med | Snapshot regression tests (T6) |
+| 300 hand-written questions is too much effort | Med | Split by slice across sessions; reduce total only by shrinking train, never test |
+| A silo is named but has no office behind it | Med | T8 rejects any silo without an `offices.yaml` row — it folds or is marked ownerless |
+| Corpus gaps invisible; a gold question has no supporting chunk and nobody knows why | Med | T4 manifest records every URL *considered* with a class-prefixed reason |
+| UI decisions leak into the backend, making the front end hard to swap | Med | T24 asserts no web-framework import in the service module; T23 freezes the contract first |
+| Gold answers rot as pages are rewritten; metrics stay confident and wrong | **High** | T35 pins refs to `content_hash`; stale questions leave the metric and the stale count is published |
+| Maintenance quietly turns into an unplanned tuning round | Med | T36 re-runs the frozen Checkpoint-E config only; re-tuning is a separate decision |
+| The disposable reference client quietly becomes the product | Low | Header states it is disposable; it is a test fixture with no styling budget |
+
+## Open questions
+
+- SmartCatalogIQ **terms of use** — robots permits crawling, terms unread (T7)
+- Whether Ollama Cloud returns `eval_duration`; determines exact vs proxy cost accounting (T3)
+- τ calibration method — three candidates, decided empirically (T21)
+- Whether a Tier 3 judge is used at all, pending κ against hand-scores (T19)
+- Single-label vs multi-label silos — **multi-label chosen**, cross-silo defined
+  at page level instead; revisit only if the `other` rate or hand-check accuracy
+  says the labels are unusable (T8)
+- **Front-end form is deliberately undecided** — widget, standalone site, or
+  something else. Phase 5 is built so this can be answered after Checkpoint F
+  without touching the backend
+
+## Resolved 2026-09-10
+
+- Multi-turn slice **kept** at ~15 questions rather than cut (PLAN Phase 2)
+- Silo discovery has a procedure: *a silo is a topic with an office that has a
+  published contact page.* T8b folded into T8
+- Crawl policy trimmed to robots + rate limit; `CRAWL_POLICY.md` dropped, three
+  README lines instead
+- Crawl manifest records every URL considered, with a reason for every omission
+- Analysis plan is pre-registered at Checkpoint D; significance claims confined
+  to the pooled test set, slices reported as effect size + CI only
+- Phase 4 retrieval ablations are factorial, not OFAT; the metered half stays
+  OFAT as an explicit quota decision
+- Long-term shape is maintenance, not a second build: four decay modes, four
+  alerts, and an explicit not-doing list
+- Phase 5 is a backend with a versioned stream contract; UI deferred by design
