@@ -242,12 +242,16 @@ totals reconcile against sitemap URL count exactly.
 ## Task 5: Polite fetcher + raw snapshot store
 
 **Acceptance criteria:**
-- [ ] Fetches manifest URLs at ≤1 req/s with the policy UA
-- [ ] Stores raw HTML content-hashed and dated; re-fetch of unchanged page creates no duplicate
-- [ ] Resumable — interrupting and restarting does not refetch completed URLs
-- [ ] Failures logged with status codes; run does not abort on a single 404
+- [x] Fetches manifest URLs at ≤1 req/s with the policy UA — `--rps` above 1.0 is refused outright
+- [x] Stores raw HTML content-hashed and dated; re-fetch of unchanged page creates no duplicate
+- [x] Resumable — interrupting and restarting does not refetch completed URLs
+- [x] Failures logged with status codes; run does not abort on a single 404
 
-**Verification:** Two consecutive full runs; second completes with ~0 new snapshots written.
+**Verification:** `pytest tests/test_fetcher.py` — 19 tests against a loopback HTTP server,
+including two consecutive full runs with 0 new snapshots on the second, an interrupted pass
+resuming without refetching, and a robots-forbidden URL that is never requested. A 25-page
+rehearsal against the live site succeeded. **The full 2,454-URL pass is held for Checkpoint A
+sign-off** — it is ~41 minutes of sustained traffic to someone else's server.
 
 **Dependencies:** T4 · **Scope:** M
 

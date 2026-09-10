@@ -11,8 +11,8 @@ Design rationale lives in `PLAN.md`.
 - [ ] **Checkpoint A** — harness, robots, written quota budget
 
 ## Phase 1 — Corpus
-- [ ] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
-- [ ] T5 · Polite fetcher + raw snapshot store (M)
+- [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
+- [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl awaits Checkpoint A sign-off**
 - [ ] T6 · Extraction + regression snapshot test (M)
 - [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M)
 - [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b
