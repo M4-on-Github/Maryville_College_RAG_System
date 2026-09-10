@@ -6,15 +6,19 @@
 
 | | count | share |
 |---|---:|---:|
-| excluded | 5479 | 100.0% |
+| excluded | 5432 | 99.1% |
+| fetched | 46 | 0.8% |
+| failed | 1 | 0.0% |
 | **total** | **5479** | |
 
 ### By reason class
 
 | | count | share |
 |---|---:|---:|
-| policy | 4333 | 79.1% |
+| policy | 4278 | 78.1% |
 | robots_disallow | 1146 | 20.9% |
+| extraction_empty | 8 | 0.1% |
+| http_error | 1 | 0.0% |
 | **total** | **5479** | |
 
 ### By source sitemap
@@ -56,7 +60,7 @@
 
 | | count | share |
 |---|---:|---:|
-| policy:pending_fetch | 2454 | 44.8% |
+| policy:pending_fetch | 2399 | 43.8% |
 | policy:news_excluded | 918 | 16.8% |
 | policy:events_excluded | 822 | 15.0% |
 | policy:duplicate_view | 87 | 1.6% |
@@ -72,4 +76,7 @@
 | Disallow: /news/smart_catalog_prog/* | 138 | 2.5% |
 | **total** | **5479** | |
 
-Pending fetch: 2454
+Fetched: 46; redirected: 3
+Extracted chars -- median 1008, min 231, max 32261
+
+Pending fetch: 2399
