@@ -136,7 +136,13 @@ class TrafilaturaExtractor(Extractor):
                 items = sorted(
                     node.get("itemListElement", []), key=lambda e: e.get("position", 0)
                 )
-                crumbs = tuple(str(e["name"]).strip() for e in items if e.get("name"))
+                # Unescaped: the plugin double-encodes, so a label arrives as
+                # "Partner &#038; Connect". Task 8 maps silos off these labels,
+                # and a silo named after an entity reference is a silo nothing
+                # matches.
+                crumbs = tuple(
+                    html_module.unescape(str(e["name"])).strip() for e in items if e.get("name")
+                )
                 if crumbs:
                     return crumbs
         return ()

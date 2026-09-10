@@ -102,6 +102,22 @@ def test_breadcrumbs_are_read_from_structured_data():
     assert crumbs[-1] == "Accounting Minor"
 
 
+def test_breadcrumb_labels_are_decoded_like_titles_are():
+    """The SEO plugin double-encodes: "Partner &#038; Connect" arrives as-is.
+
+    Task 8 maps silos off these labels, so an entity reference left in one
+    becomes a silo name that nothing ever matches.
+    """
+    html = (
+        '<script type="application/ld+json">'
+        '{"@graph":[{"@type":"BreadcrumbList","itemListElement":['
+        '{"position":1,"name":"About"},'
+        '{"position":2,"name":"Partner &#038; Connect"}]}]}'
+        "</script>"
+    )
+    assert TrafilaturaExtractor.breadcrumb_of(html) == ("About", "Partner & Connect")
+
+
 def test_top_level_page_has_no_breadcrumb():
     html, _ = load("about")
     assert TrafilaturaExtractor.breadcrumb_of(html) == ()
