@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcrag"
+version = "0.1.0"
+description = "Cross-silo RAG over maryvillecollege.edu and its SmartCatalogIQ catalog"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "trafilatura>=1.8",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+index = ["lancedb>=0.6", "sentence-transformers>=2.7", "rank-bm25>=0.2.2"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.4"]
+
+[tool.setuptools.packages.find]
+include = ["mcrag*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
