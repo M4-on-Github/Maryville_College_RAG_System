@@ -1,9 +1,9 @@
-"""Fetch the manifest's pending-fetch queue into the raw snapshot store.
+"""Fetch every in-scope URL in the manifest into the raw snapshot store.
 
 This one puts real, sustained traffic on a live institutional site: roughly
 2,450 requests at one per second, about 41 minutes. Run it deliberately.
 
-    python scripts/fetch_corpus.py --contact you@example.edu --limit 25   # rehearsal
+    python scripts/fetch_corpus.py --contact you@example.edu --sample 30  # rehearsal
     python scripts/fetch_corpus.py --contact you@example.edu              # full pass
 
 Interrupting is safe. The pass state file records what has been done, and a
@@ -23,9 +23,36 @@ from mcrag.crawl.fetcher import CrawlPass, Fetcher, SnapshotStore  # noqa: E402
 from mcrag.crawl.manifest import Manifest  # noqa: E402
 from mcrag.crawl.ratelimit import RateLimiter  # noqa: E402
 from mcrag.crawl.robots import RobotsPolicy, build_user_agent  # noqa: E402
-from mcrag.crawl.sitemap import pending_fetch  # noqa: E402
+from mcrag.crawl.sitemap import fetch_queue  # noqa: E402
 
 BASE = "https://www.maryvillecollege.edu"
+
+
+def stratified_sample(manifest: Manifest, urls: list[str], n: int) -> list[str]:
+    """Spread a sample of ``n`` URLs across sitemaps and top-level path prefixes.
+
+    Deterministic: strata are visited round-robin in sorted order and each is
+    drawn from in sorted order, so the same queue always yields the same sample.
+    A seeded random draw would do as well; this is easier to eyeball.
+    """
+    strata: dict[tuple[str, str], list[str]] = {}
+    for url in urls:
+        record = manifest.records[url]
+        prefix = url.replace(BASE, "").strip("/").split("/")[0] or "(root)"
+        strata.setdefault((record.source, prefix), []).append(url)
+
+    picked: list[str] = []
+    keys = sorted(strata)
+    depth = 0
+    while len(picked) < n and any(len(strata[k]) > depth for k in keys):
+        for key in keys:
+            bucket = strata[key]
+            if depth < len(bucket):
+                picked.append(bucket[depth])
+                if len(picked) == n:
+                    return picked
+        depth += 1
+    return picked
 
 
 def main() -> int:
@@ -36,6 +63,14 @@ def main() -> int:
     parser.add_argument("--state", default="corpus/.crawl_pass.json", type=Path)
     parser.add_argument("--rps", type=float, default=1.0, help="requests per second ceiling")
     parser.add_argument("--limit", type=int, default=0, help="stop after N URLs (0 = all)")
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=0,
+        help="fetch N URLs spread across every source sitemap and path prefix, "
+        "rather than the first N. Use this for a rehearsal: the first N URLs "
+        "alphabetically are all one silo, which tells you nothing about the rest.",
+    )
     args = parser.parse_args()
 
     if args.rps > 1.0:
@@ -52,10 +87,15 @@ def main() -> int:
         print(f"no manifest at {args.manifest} -- run scripts/enumerate_corpus.py", file=sys.stderr)
         return 1
 
-    queue = pending_fetch(manifest)
+    queue = fetch_queue(manifest)
     state = CrawlPass(args.state)
     unvisited = [u for u in queue if not state.visited(u)]
-    remaining = unvisited[: args.limit] if args.limit else unvisited
+    if args.sample:
+        remaining = stratified_sample(manifest, unvisited, args.sample)
+    elif args.limit:
+        remaining = unvisited[: args.limit]
+    else:
+        remaining = unvisited
 
     print(
         f"user agent: {user_agent}\n"
@@ -83,7 +123,7 @@ def main() -> int:
             remaining,
             pass_state=state,
             on_progress=progress,
-            close_pass=len(remaining) == len(unvisited),
+            close_pass=len(remaining) == len(unvisited) and not args.sample,
         )
     except KeyboardInterrupt:
         manifest.save()

@@ -13,7 +13,7 @@ Design rationale lives in `PLAN.md`.
 ## Phase 1 — Corpus
 - [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
 - [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl awaits Checkpoint A sign-off**
-- [ ] T6 · Extraction + regression snapshot test (M)
+- [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD
 - [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M)
 - [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b
 - [ ] ~~T8b · Office contact-routing table~~ — **merged into T8.** It is a byproduct of discovery step 3, not follow-on work

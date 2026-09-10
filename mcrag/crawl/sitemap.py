@@ -269,11 +269,28 @@ class SitemapCrawler:
 
 
 def pending_fetch(manifest: Manifest) -> list[str]:
-    """URLs cleared for fetching. This is the fetcher's work queue."""
+    """URLs cleared for fetching that have never been fetched."""
     return sorted(
         r.url
         for r in manifest.records.values()
         if r.status == Status.EXCLUDED and r.reason == "policy:pending_fetch"
+    )
+
+
+def fetch_queue(manifest: Manifest) -> list[str]:
+    """Every in-scope URL, fetched before or not. The re-crawl queue.
+
+    Distinct from :func:`pending_fetch`, which shrinks as pages are fetched. A
+    queue that shrinks is right for finishing the first crawl and wrong for
+    every crawl after it: a page fetched in March still has to be re-checked in
+    September, and only the content hash can say whether it changed.
+    """
+    return sorted(
+        r.url
+        for r in manifest.records.values()
+        if r.status == Status.FETCHED
+        or (r.status == Status.EXCLUDED and r.reason == "policy:pending_fetch")
+        or (r.status == Status.FAILED and (r.http is None or r.http >= 500))
     )
 
 

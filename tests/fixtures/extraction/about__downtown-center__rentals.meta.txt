@@ -1,0 +1,3 @@
+url: https://www.maryvillecollege.edu/about/downtown-center/rentals/
+title: Downtown Center Rental
+breadcrumb: About > Downtown Center > Rental Information

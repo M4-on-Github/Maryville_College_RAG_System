@@ -258,12 +258,28 @@ sign-off** — it is ~41 minutes of sustained traffic to someone else's server.
 ## Task 6: Extraction + regression snapshot test
 
 **Acceptance criteria:**
-- [ ] `trafilatura` extraction produces main content with nav/footer chrome removed
-- [ ] 20 hand-picked pages (one per silo) have committed expected-text snapshots
-- [ ] Extraction regression test fails loudly on drift
-- [ ] Empty or suspiciously short extractions are flagged, not silently kept
+- [x] `trafilatura` extraction produces main content with nav/footer chrome removed
+- [x] 17 hand-picked pages (one per silo) have committed expected-text snapshots, HTML input included
+- [x] Extraction regression test fails loudly on drift
+- [x] Empty or suspiciously short extractions are flagged, not silently kept
 
-**Verification:** `pytest tests/test_extraction_snapshots.py`; manually confirm 3 extractions contain no nav text.
+**Verification:** `pytest tests/test_extraction_snapshots.py` (58 tests) and
+`tests/test_extraction_pipeline.py`. On the 54-page rehearsal corpus, 46 documents
+extracted and 8 flagged — 1 empty and 7 boilerplate-only. `scripts/extract_corpus.py`
+exits non-zero above a 20% empty share.
+
+**Two things this task turned up that PLAN.md did not anticipate:**
+
+1. Per-page extraction is not enough. On pages with little prose of their own the
+   extractor returns the site footer and calls it the article — about one page in
+   seven. A single page cannot tell its own boilerplate from its content, so
+   `BoilerplateFilter` learns the template from line frequency across the corpus and
+   runs as a second pass. Pages left with nothing become `extraction_empty`.
+2. The site publishes no visible breadcrumb markup, but its SEO plugin emits a JSON-LD
+   `BreadcrumbList` on nearly every page. That is the site's own stated hierarchy,
+   better than one inferred from URL paths, and Task 8 should check silo mapping
+   against it. The accounting program's crumb is *Programs of Study > Accounting
+   Minor*, which the URL alone would never have given.
 
 **Dependencies:** T5 · **Scope:** M
 

@@ -1,0 +1,3 @@
+url: https://www.maryvillecollege.edu/academics/programs-of-study/american-sign-language-and-deaf-studies/
+title: American Sign Language and Deaf Studies
+breadcrumb: Programs of Study > American Sign Language and Deaf Studies
