@@ -198,21 +198,69 @@ parser is needed anyway to discover sitemaps, so enforcement is nearly free.
 phase is designed around. **Do this early — it is the project's largest unknown.**
 
 **Acceptance criteria:**
-- [ ] Authenticated call to `gpt-oss:20b-cloud` returns text
-- [ ] `num_ctx` set explicitly; a prompt exceeding it raises rather than truncating silently
-- [ ] Reasoning channel parsed and separated from visible answer
-- [ ] 20 sample questions run; `eval_duration` / `prompt_eval_duration` recorded per query
-- [ ] `docs/quota-calibration.md` states seconds/query and derived **full gold-set passes affordable per weekly reset**
+- [x] Authenticated call to `gpt-oss:20b-cloud` returns text
+- [x] `num_ctx` set explicitly; a prompt exceeding it raises rather than truncating silently
+- [x] Reasoning channel parsed and separated from visible answer
+- [x] 20 sample questions run; per-query cost recorded (`eval_duration` /
+      `prompt_eval_duration` do not exist for this model -- see below; client
+      wall-clock, token counts and `timing_source` are recorded instead)
+- [x] `docs/quota-calibration.md` states seconds/query and derived **full gold-set passes affordable per weekly reset**
 
-**Verification:** Manual review of the calibration doc. Confirm whether cloud returns duration fields at all; if not, record that client wall-clock is the fallback.
+**Verification:** `docs/quota-calibration.md`, generated from
+`runs/20260910T224550Z_f4f0da4d39e0/`. 20 of 20 calls succeeded. Median
+**2.32 s/query** (95% CI 1.76-2.97, n=20) on realistic k=5 RAG prompts of
+~1,077 prompt tokens. Regenerating the report from the run directory costs
+nothing: the calls are on disk and the truncation probe is cached.
+
+### Four things this task settled that PLAN left open
+
+**The endpoint returns no durations.** `usage` carries token counts once
+`stream_options: {include_usage: true}` is sent, but there is no `eval_duration`
+and no `prompt_eval_duration` on the OpenAI-compatible surface. **Client
+wall-clock is the cost measure**, and every `Usage` record says so in
+`timing_source` rather than leaving a reader to assume. Wall-clock includes
+queueing behind the single free-tier concurrency slot, so it is an upper bound
+on GPU time -- the safe direction for a budget.
+
+**The native endpoint does not rescue it, and PLAN said it would.** PLAN 2a
+asserts that Ollama returns `total_duration`, `prompt_eval_duration` and
+`eval_duration` on the final chunk "for cloud models too", and recommends the
+native surface for eval runs on that basis. Probed with three cheap calls
+(`probe_native_durations`, cached to `native_probe.json`): `/api/chat` returns
+`total_duration`, `prompt_eval_count` and `eval_count`, and **neither**
+`prompt_eval_duration` **nor** `eval_duration`. `total_duration` is genuinely
+server-side and ran about 0.2s under wall-clock on 1.3-2.1s calls, so it is a
+tighter number if a later run wants one -- but it is a total. Prompt processing
+cannot be separated from generation, so an arm that inflates the prompt and an
+arm that inflates the answer are indistinguishable on cost. PLAN 2a is corrected
+in place and the open question is closed.
+
+**`num_ctx` really does truncate silently.** Probed deliberately: ~15,000
+estimated tokens sent against `num_ctx` 8192 with the client guard stood down.
+The server counted 8,243 prompt tokens, returned no error and no warning, and
+answered without the fact planted at the front of the prompt. This is why
+`OllamaCloudGenerator.check_prompt` raises instead of trimming, and why
+`enforce_context=False` exists in exactly one place: the probe that proves it.
+
+**The budget is not the constraint PLAN assumed it was.** PLAN 2a sized the
+project around 5-15 s/query and a 12-40 minute pass. The whole metered ablation
+program -- 10 arms over the 120-question test split -- is **1,200 queries and
+about 0.8 hours** of sequential wall-clock. That does not license spending the
+test split more freely; it moves the OFAT restriction on the metered half from a
+budget decision to a **statistical** one, to be re-argued at Checkpoint D
+against the pre-registered analysis plan and not against cost.
+
+A fourth, smaller finding worth carrying forward: **83% of generated tokens are
+reasoning**, not answer. Any latency comparison between arms is mostly a
+comparison of how much the model thought.
 
 **Dependencies:** None · **Scope:** S
 
 ### ✅ Checkpoint A
-- [ ] Run harness writes complete, resumable run dirs
-- [ ] Robots enforcement passes tests
-- [ ] Quota budget is a written number, not an assumption
-- [ ] **Human review before building the crawler**
+- [x] Run harness writes complete, resumable run dirs — the calibration run has all three locks, resumed cleanly, and regenerates its report without re-spending
+- [x] Robots enforcement passes tests
+- [x] Quota budget is a written number, not an assumption — `docs/quota-calibration.md`
+- [ ] **Human review before building the crawler** — *outstanding.* The crawler is built and tested; two rehearsals totalling 55 pages have run. The full 2,454-URL pass is held pending sign-off
 
 ---
 
@@ -830,7 +878,10 @@ re-run reuses the frozen config, and both rows survive regeneration.
 ## Open questions
 
 - SmartCatalogIQ **terms of use** — robots permits crawling, terms unread (T7)
-- Whether Ollama Cloud returns `eval_duration`; determines exact vs proxy cost accounting (T3)
+- ~~Whether Ollama Cloud returns `eval_duration`~~ -- **closed by T3: it does not,**
+  on either surface. Cost accounting is client wall-clock, labelled as such in
+  `timing_source`; the native endpoint offers `total_duration` and nothing finer
+  (`docs/quota-calibration.md`)
 - τ calibration method — three candidates, decided empirically (T21)
 - Whether a Tier 3 judge is used at all, pending κ against hand-scores (T19)
 - Single-label vs multi-label silos — **multi-label chosen**, cross-silo defined

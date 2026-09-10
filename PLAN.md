@@ -941,17 +941,31 @@ measurement**. Any latency win is directly a quota win. Two traps:
   Logging only visible answer length understates cost — by the largest margin
   on hard questions, i.e. exactly the cross-silo slice this project exists to
   serve. Log reasoning tokens as their own field.
-- **Use server-side durations, not client wall-clock.** Confirmed: Ollama
-  returns `total_duration`, `prompt_eval_duration`, `eval_duration`,
-  `prompt_eval_count` and `eval_count` — all in **nanoseconds** — on the final
-  streaming chunk (`done: true`), for cloud models too. That is server compute,
-  free of network and queue noise. Use the **native** endpoint for eval runs and
-  the OpenAI-compatible one in the app; both serve cloud models.
-- **⚠️ Trust durations over counts.** `prompt_eval_count` reports the *total
-  context size sent*, not GPU work actually performed — a cached prompt prefix
-  still counts in full. Since quota is GPU-time-metered, `prompt_eval_count`
-  **overstates burn on every query reusing a cached system prompt**.
-  `prompt_eval_duration` is the honest number.
+- **~~Use server-side durations, not client wall-clock.~~ Measured false for
+  this model (Task 3, 2026-09-10).** The claim was that Ollama returns
+  `total_duration`, `prompt_eval_duration`, `eval_duration`, `prompt_eval_count`
+  and `eval_count` in nanoseconds on the final chunk, for cloud models too. What
+  `gpt-oss:20b-cloud` actually returns:
+  - OpenAI-compatible `/v1/chat/completions`: token counts only, and only when
+    `stream_options: {include_usage: true}` is sent. **No durations at all.**
+  - Native `/api/chat`: `total_duration`, `prompt_eval_count`, `eval_count`.
+    **No `prompt_eval_duration`, no `eval_duration`.**
+
+  So the app uses the OpenAI-compatible surface and **client wall-clock is the
+  cost measure**, recorded as `timing_source` on every `Usage` so no reader has
+  to assume it. Wall-clock includes queueing behind the free tier's single
+  concurrency slot, making it an upper bound on GPU time — conservative, which
+  is the right direction for a budget to err in. Probed head to head,
+  `total_duration` ran about 0.2s under wall-clock on calls of 1.3-2.1s.
+  Evidence: `docs/quota-calibration.md`, `runs/*/native_probe.json`.
+- **⚠️ Trust durations over counts — not an option here.** `prompt_eval_count`
+  reports the *total context size sent*, not GPU work actually performed: a
+  cached prompt prefix still counts in full, so it **overstates burn on every
+  query reusing a cached system prompt**. `prompt_eval_duration` would be the
+  honest number, and this endpoint does not report it. Nothing separates prompt
+  processing from generation, so an arm that inflates the prompt and an arm that
+  inflates the answer are indistinguishable on cost. Report counts and seconds
+  side by side; present neither as GPU time.
 
 **Decompose latency per stage** — the total is not actionable:
 

@@ -1,0 +1,20 @@
+# Task 3: what one metered query costs. Not an ablation arm and not a baseline.
+#
+# The retrieval section is deliberately empty. This run measures the generator
+# alone against prompts of realistic size, so that a later arm's cost can be
+# read as the arm's doing rather than the endpoint's.
+name: quota-calibration
+arm: calibration
+seed: 42
+notes: |
+  Twenty throwaway questions against context assembled from the extracted
+  corpus. These are not gold questions -- gold authoring is Task 12, and a
+  question written to measure latency is written to the wrong specification.
+generation:
+  model: gpt-oss:20b-cloud
+  base_url: https://ollama.com/v1
+  num_ctx: 8192
+  temperature: 0.0
+  max_tokens: 1024
+  generator:
+    class: mcrag.generate.ollama_cloud:OllamaCloudGenerator

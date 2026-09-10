@@ -4,11 +4,11 @@ Detail, acceptance criteria and verification steps live in `tasks/plan.md`.
 Design rationale lives in `PLAN.md`.
 
 ## Phase 0 — Foundations
-- [ ] T1 · Config schema + run-logging harness (M)
-- [ ] T2 · Robots enforcement + rate limiter (S)
-- [ ] T3 · Ollama Cloud smoke test + quota calibration (S) ← *largest unknown, do early*
+- [x] T1 · Config schema + run-logging harness (M)
+- [x] T2 · Robots enforcement + rate limiter (S)
+- [x] T3 · Ollama Cloud smoke test + quota calibration (S) — `docs/quota-calibration.md`; 2.3s/query, no server durations, silent truncation confirmed
 - [ ] ~~T0 · Verify the Ask Scottie premise~~ — **dropped.** Incumbent demoted to background (§0); the three project claims are measurable standalone
-- [ ] **Checkpoint A** — harness, robots, written quota budget
+- [ ] **Checkpoint A** — harness, robots, written quota budget — **three of four met; awaiting human review before the full crawl**
 
 ## Phase 1 — Corpus
 - [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
