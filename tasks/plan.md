@@ -362,7 +362,11 @@ silo.
 - [ ] Step 1 — path-prefix histogram over the manifest, with page counts, committed as data
 - [ ] Step 2 — top nav and breadcrumb trails harvested; **nav/URL disagreements recorded**, not silently resolved
 - [ ] Step 3 — each candidate matched against the staff/office directory; match promotes to silo **and emits a contact row**
-- [ ] `data/silos.yaml` (taxonomy) and `data/offices.yaml` (name → contact URL + email) both exist and are data, not code
+- [ ] `data/silos.yaml` (taxonomy) and `data/offices.yaml` (name → contact URL + email +
+      **referral destination URL**, per decision 0002) both exist and are data, not code
+- [ ] Every offices row carries a destination URL a person should land on, hand-checked.
+      A referral may point at a page we never crawled, including a robots-disallowed one;
+      it may never be quoted from (decision 0002)
 - [ ] Every non-`other` silo has an offices row. **A silo without a contact is a failed match and must fold or be marked ownerless**
 - [ ] Mapper assigns **multi-label** silos from path + breadcrumb
 - [ ] `other` rate measured and reported; **>10% means the mapper is broken, not the site** → revise

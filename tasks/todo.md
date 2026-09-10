@@ -15,7 +15,7 @@ Design rationale lives in `PLAN.md`.
 - [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl awaits Checkpoint A sign-off**
 - [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD
 - [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M)
-- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b
+- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002)
 - [ ] ~~T8b · Office contact-routing table~~ — **merged into T8.** It is a byproduct of discovery step 3, not follow-on work
 - [ ] T9 · Heading-aware chunker + metadata stamping (M)
 - [ ] T10 · Incremental reindex (M)
@@ -23,7 +23,7 @@ Design rationale lives in `PLAN.md`.
 - [ ] **Checkpoint B** — corpus indexed, chunks reviewed, coverage reconciled
 
 ## Phase 2 — Gold set
-- [ ] T12 · Gold-set schema + split tooling (M)
+- [ ] T12 · Gold-set schema + split tooling (M) — schema carries an expected referral; refusal correctness splits into refused-correctly and routed-correctly (decision 0002)
 - [ ] T13 · Author ~300 questions (L — split by slice, incl. the ~15 multi-turn slice)
 - [ ] **Checkpoint C** — dataset validated, split, locked
 
