@@ -43,17 +43,44 @@ def report(manifest: Manifest, markdown: bool = False) -> str:
     if total == 0:
         return "manifest is empty -- run scripts/enumerate.py first"
 
+    # `policy:pending_fetch` is a queue position, not a decision: the record is
+    # in scope and will be fetched. Counting it as "excluded" alongside a real
+    # policy or robots exclusion overstates how much of the corpus was dropped
+    # on purpose. It gets its own line below instead.
+    queued = [
+        r for r in manifest.records.values()
+        if r.status == Status.EXCLUDED and r.reason == "policy:pending_fetch"
+    ]
+    decided = total - len(queued)
+
     out = [f"# Corpus coverage\n\n{total} URLs considered." if markdown else f"{total} URLs considered."]
-    out.append(_table("By status", manifest.by_status(), total, markdown))
-    out.append(_table("By reason class", manifest.by_reason_class(), total, markdown))
+    if queued:
+        out.append(
+            f"{len(queued)} still queued (in scope, not yet fetched) -- "
+            f"excluded from the tables below, which cover the {decided} decided URLs."
+        )
+    if decided:
+        decided_status = Counter(
+            str(r.status) for r in manifest.records.values()
+            if not (r.status == Status.EXCLUDED and r.reason == "policy:pending_fetch")
+        )
+        decided_reason_class = Counter(
+            r.reason_class for r in manifest.records.values()
+            if r.reason_class and not (r.status == Status.EXCLUDED and r.reason == "policy:pending_fetch")
+        )
+        out.append(_table("By status", decided_status, decided, markdown))
+        out.append(_table("By reason class", decided_reason_class, decided, markdown))
     out.append(_table("By source sitemap", manifest.by_source(), total, markdown))
 
-    # The detail that matters most: which policy excluded what.
+    # The detail that matters most: which policy excluded what. pending_fetch
+    # is excluded here for the same reason it is above -- it is a queue
+    # position, not a policy that dropped a page.
     policy = Counter(
-        r.reason for r in manifest.records.values() if r.reason and r.reason.startswith("policy:")
+        r.reason for r in manifest.records.values()
+        if r.reason and r.reason.startswith("policy:") and r.reason != "policy:pending_fetch"
     )
     if policy:
-        out.append(_table("Policy exclusions in detail", policy, total, markdown))
+        out.append(_table("Policy exclusions in detail", policy, decided, markdown))
 
     # Robots exclusions grouped by the rule that matched, not by URL.
     by_rule: defaultdict[str, int] = defaultdict(int)

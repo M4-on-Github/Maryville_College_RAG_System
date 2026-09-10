@@ -8,16 +8,16 @@ Design rationale lives in `PLAN.md`.
 - [x] T2 · Robots enforcement + rate limiter (S)
 - [x] T3 · Ollama Cloud smoke test + quota calibration (S) — `docs/quota-calibration.md`; 2.3s/query, no server durations, silent truncation confirmed
 - [ ] ~~T0 · Verify the Ask Scottie premise~~ — **dropped.** Incumbent demoted to background (§0); the three project claims are measurable standalone
-- [ ] **Checkpoint A** — harness, robots, written quota budget — **three of four met; awaiting human review before the full crawl**
+- [x] **Checkpoint A** — harness, robots, written quota budget — human review cleared 2026-09-10: catalog gap accepted (handled via decision 0002 referrals), events exclusion kept, go-ahead given for the full crawl
 
 ## Phase 1 — Corpus
 - [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
-- [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl awaits Checkpoint A sign-off**
+- [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl launched 2026-09-10, running in background** (`runs/full_crawl.log`)
 - [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD
-- [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M)
-- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002)
+- [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M) — needs the full crawl to finish
+- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002); needs the full crawl to finish
 - [ ] ~~T8b · Office contact-routing table~~ — **merged into T8.** It is a byproduct of discovery step 3, not follow-on work
-- [ ] T9 · Heading-aware chunker + metadata stamping (M)
+- [x] T9 · Heading-aware chunker + metadata stamping (M) — built as paragraph-boundary chunking, not heading-boundary (measured heading sparsity, see `tasks/plan.md`); `silo` stamps `()` until T8 runs
 - [ ] T10 · Incremental reindex (M)
 - [ ] T11 · Build dense + BM25 + literal indexes (M)
 - [ ] **Checkpoint B** — corpus indexed, chunks reviewed, coverage reconciled

@@ -381,15 +381,30 @@ accuracy. Assert every silo in `silos.yaml` except `other` resolves to a row in
 
 ## Task 9: Heading-aware chunker + metadata stamping
 
+**What this task settled that PLAN left open.** The acceptance criteria below
+assumed `Document.text` carries H2/H3 markers. Measured false:
+`TrafilaturaExtractor` uses trafilatura's default plain-text output, which
+discards heading tags. A markdown re-extraction of the rehearsal corpus found
+at most one or two real headings per page — the site's templates lean on bold
+text and paragraph breaks, not semantic headings, for structure. Changing the
+extractor to keep them would touch every committed fixture and the
+boilerplate filter's learned template for a signal present on a minority of
+pages, and would inject `**`/`##` characters into the retrieval text on all of
+them. `ParagraphChunker` (`mcrag/chunk/paragraph_chunker.py`) instead packs on
+the finest boundary the corpus actually offers — the paragraph break the
+extractor already preserves — and treats a real heading, when the extractor
+is later changed to keep one, as something only the boundary-detection method
+needs to learn about.
+
 **Acceptance criteria:**
-- [ ] Chunks respect H2/H3 boundaries; cap 400 tokens, ~15% overlap
-- [ ] **No chunk exceeds the embedder's 512-token limit** (asserted, not assumed)
-- [ ] Every chunk carries: `source_url`, `title`, `breadcrumb`, `silo`, `heading_path`, `crawled_at`, `content_hash`, `catalog_year`
-- [ ] `chunk_size` and overlap are config-driven for the §2c sweep
+- [x] ~~Chunks respect H2/H3 boundaries~~ Chunks respect paragraph boundaries (see above); cap 400 tokens, ~15% overlap
+- [x] **No chunk exceeds the embedder's 512-token limit** (asserted per chunk in `chunk()`, not assumed — verified against real `bge-base-en-v1.5` tokenizer over all 46 rehearsal documents: 99 chunks, max 454 tokens, 0 violations)
+- [x] Every chunk carries: `source_url`, `title`, `breadcrumb`, `silo`, `heading_path`, `crawled_at`, `content_hash`, `catalog_year` (`heading_path` is `(doc.title,)` until the extractor preserves real headings)
+- [x] `chunk_size` (`max_tokens`) and overlap are config-driven constructor args, not constants
 
-**Verification:** Assert max token length over the full corpus; spot-check 10 chunks for coherent heading paths.
+**Verification:** `tests/test_chunker.py` (15 tests, `FakeTokenCounter`) plus `tests/test_token_counter.py` (4 tests, real tokenizer). Ran over the 46-page rehearsal corpus: 99 chunks, max 454 tokens, 0 hard-limit violations.
 
-**Dependencies:** T8 · **Scope:** M
+**Dependencies:** ~~T8~~ built and tested against the rehearsal corpus without it; `silo` stamps as `()` until T8 fills it · **Scope:** M
 
 ## Task 10: Incremental reindex
 
