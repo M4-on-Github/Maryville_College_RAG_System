@@ -39,6 +39,7 @@ corpus/raw/
 # crawl resume state, local to a machine
 corpus/.crawl_pass.json
 corpus/extracted/
+corpus/chunks.jsonl
 *.warc
 *.warc.gz
 
@@ -60,6 +61,9 @@ runs/
 # Locks and decisions ARE tracked — they are the provenance record.
 # Listed here only to document that their exclusion would be a mistake:
 # !**/corpus.lock, !**/model.lock, !**/split.lock, !decisions/
+
+# Claude Code local session state
+.claude/
 
 # ---- OS / editor ----
 .DS_Store

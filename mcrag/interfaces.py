@@ -92,3 +92,25 @@ class Indexer(ABC):
     @abstractmethod
     def delete_by_source_url(self, url: str) -> int:
         """Return the number of chunks removed. Incremental reindex needs this."""
+
+    @abstractmethod
+    def upsert(self, chunks: Iterable[Chunk]) -> None:
+        """Add or replace chunks by `chunk_id`, without rebuilding the whole index.
+
+        Incremental reindex (T10) is delete-by-source_url then upsert -- never a
+        full `build()` -- so an unchanged corpus is a true no-op.
+        """
+
+
+class Embedder(ABC):
+    """Text -> dense vectors. The only seam a dense index needs swapped out.
+
+    No I/O in `__init__` -- a concrete embedder loads its model lazily, on
+    first call to `embed`, so constructing one in a test doesn't require a
+    network fetch or a GPU.
+    """
+
+    dim: int
+
+    @abstractmethod
+    def embed(self, texts: list[str]) -> list[list[float]]: ...

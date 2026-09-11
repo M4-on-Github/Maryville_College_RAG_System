@@ -13,13 +13,13 @@ Design rationale lives in `PLAN.md`.
 ## Phase 1 — Corpus
 - [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
 - [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl completed 2026-09-10**, 77.1 min, 2189 changed/new, 210 failed (all one server-side infinite-redirect loop on the staff sitemap, confirmed not a fetcher bug), 0 robots-refused (`runs/full_crawl.log`, `docs/coverage.md` regenerated)
-- [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD; re-run over the full crawl: 2243 snapshots -> 1847 documents
+- [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD; re-run over the full crawl: 2243 snapshots -> 1699 documents (fixed a redirect-fan-in dedup bug under T10/T11 that had inflated this to 1847; see `tasks/plan.md` T11 note)
 - [x] T7 · ~~SmartCatalogIQ nav-tree adapter + terms check~~ **Catalog coverage assessment** (M) — decision 0001 already showed there's no separate host/nav-tree to crawl; verified course-level substitute (763/772 course pages extracted, 98.8%) and confirmed the program-requirements gap is real (program pages carry overviews, not requirement lists), see `tasks/plan.md`
 - [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002); **steps 1-3 done** (histogram, nav/breadcrumb harvest, office-candidate matching — see `tasks/plan.md`); step 3 found 6 high-confidence division-office rows (`data/division_offices.csv`) plus 15/25 prefix candidates (`data/office_candidates.csv`, some are false positives — a personal faculty page, not an office); **step 4 (final `silos.yaml`/`offices.yaml` + `decisions/` writeup) needs a human to review and correct `data/office_candidates.csv` first — not something to auto-approve per decision 0002**
 - [ ] ~~T8b · Office contact-routing table~~ — **merged into T8.** It is a byproduct of discovery step 3, not follow-on work
-- [x] T9 · Heading-aware chunker + metadata stamping (M) — built as paragraph-boundary chunking, not heading-boundary (measured heading sparsity, see `tasks/plan.md`); re-validated against the full 1847-document corpus (3495 chunks, max 509 tokens, 0 violations); `silo` stamps `()` until T8 runs
-- [ ] T10 · Incremental reindex (M)
-- [ ] T11 · Build dense + BM25 + literal indexes (M)
+- [x] T9 · Heading-aware chunker + metadata stamping (M) — built as paragraph-boundary chunking, not heading-boundary (measured heading sparsity, see `tasks/plan.md`); re-validated against the full corpus (3237 chunks over the corrected 1699-document corpus, max 509 tokens, 0 violations); `silo` stamps `()` until T8 runs
+- [x] T10 · Incremental reindex (M) — `mcrag/index_pipeline.py`; content-hash diff, delete-by-source_url then upsert, true no-op on an unchanged corpus, `corpus.lock` snapshot hash; does not depend on T8
+- [x] T11 · Build dense + BM25 + literal indexes (M) — `mcrag/retrieval/{dense,bm25,literal}.py` + `embedding_cache.py`; `scripts/chunk_corpus.py` persists `corpus/chunks.jsonl`, `scripts/build_indexes.py` builds `indexes/` for real (LanceDB dense, pickled BM25/literal); did not depend on T8. Caught and fixed a real extraction-pipeline dedup bug (redirect fan-in) along the way — see `tasks/plan.md`
 - [ ] **Checkpoint B** — corpus indexed, chunks reviewed, coverage reconciled
 
 ## Phase 2 — Gold set

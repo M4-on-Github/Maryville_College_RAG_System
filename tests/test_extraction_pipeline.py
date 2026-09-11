@@ -128,6 +128,47 @@ def test_redirected_page_maps_back_to_its_manifest_record(tmp_path):
     assert manifest.records[requested].extracted_chars == len(html)
 
 
+def test_redirect_fan_in_produces_one_document_not_two(tmp_path):
+    """Two different requested URLs can redirect to the same final page.
+
+    Regression test: `extract_all` used to append one Document per manifest
+    record with no dedup on the final URL, so a fan-in redirect (an old path
+    and its replacement both landing on one page) wrote two rows for the same
+    page to the extracted corpus.
+    """
+    manifest = Manifest(path=tmp_path / "manifest.jsonl")
+    store = SnapshotStore(tmp_path / "raw")
+    final = BASE + "/new/"
+    old_path, direct_path = BASE + "/old/", final
+    html = "content " * 60
+
+    manifest.consider(old_path, source="posts-page")
+    manifest.mark_fetched(
+        old_path,
+        http=200,
+        content_hash="h",
+        bytes_len=len(html),
+        final_url=final,
+        fetched_at=datetime(2026, 9, 10, 20, 0, tzinfo=timezone.utc),
+    )
+    store.put(old_path, html, "h")
+
+    manifest.consider(direct_path, source="posts-page")
+    manifest.mark_fetched(
+        direct_path,
+        http=200,
+        content_hash="h",
+        bytes_len=len(html),
+        fetched_at=datetime(2026, 9, 10, 21, 0, tzinfo=timezone.utc),
+    )
+    store.put(direct_path, html, "h")
+
+    documents, stats = extract_all(manifest, store, StubExtractor())
+    assert stats["extracted"] == 1
+    assert stats["redirect_fan_in"] == 1
+    assert [d.url for d in documents] == [final]
+
+
 def test_corpus_round_trips_through_disk(corpus):
     manifest, store, tmp_path = corpus
     extracted = ExtractedCorpus(tmp_path / "documents.jsonl")

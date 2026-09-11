@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from mcrag.crawl.fetcher import SnapshotStore
-from mcrag.crawl.manifest import Manifest, Status
+from mcrag.crawl.manifest import Manifest, ManifestRecord, Status
 from mcrag.extract.boilerplate import BoilerplateFilter
 from mcrag.interfaces import Extractor
 from mcrag.types import Document, RawPage
@@ -77,10 +77,15 @@ def extract_all(
     badly broken, and only the per-silo breakdown of the 400 says which.
     """
     stats: Counter[str] = Counter()
-    documents: list[Document] = []
     # A Document is keyed by its canonical URL, the manifest by the URL that was
     # requested. On a redirected page those differ, so map back before writing.
     requested: dict[str, str] = {}
+    # Two different requested URLs can redirect to the same canonical page (a
+    # fan-in redirect, e.g. an old faculty-profile path and its replacement
+    # both landing on one final URL). Keyed by canonical url so a fan-in never
+    # produces two rows for the same page; ties are broken by preferring the
+    # record that was not itself redirected, else the most recently fetched.
+    by_canonical: dict[str, tuple[ManifestRecord, Document]] = {}
 
     # Every page we hold a snapshot for, not just those currently marked
     # ``fetched``. A page marked ``extraction_empty`` by an earlier run is
@@ -104,6 +109,25 @@ def extract_all(
             stats["extraction_empty"] += 1
             continue
 
+        existing = by_canonical.get(doc.url)
+        if existing is not None:
+            stats["redirect_fan_in"] += 1
+            existing_record, _ = existing
+            existing_direct = existing_record.url == existing_record.canonical_url
+            this_direct = record.url == record.canonical_url
+            if existing_direct and not this_direct:
+                continue
+            if this_direct and not existing_direct:
+                by_canonical[doc.url] = (record, doc)
+                continue
+            if existing_record.fetched_at and record.fetched_at:
+                if existing_record.fetched_at >= record.fetched_at:
+                    continue
+
+        by_canonical[doc.url] = (record, doc)
+
+    documents = []
+    for record, doc in by_canonical.values():
         documents.append(doc)
         requested[doc.url] = record.url
         stats["extracted"] += 1

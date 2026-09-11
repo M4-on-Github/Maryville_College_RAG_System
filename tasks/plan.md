@@ -418,32 +418,34 @@ needs to learn about.
 - [x] Every chunk carries: `source_url`, `title`, `breadcrumb`, `silo`, `heading_path`, `crawled_at`, `content_hash`, `catalog_year` (`heading_path` is `(doc.title,)` until the extractor preserves real headings)
 - [x] `chunk_size` (`max_tokens`) and overlap are config-driven constructor args, not constants
 
-**Verification:** `tests/test_chunker.py` (15 tests, `FakeTokenCounter`) plus `tests/test_token_counter.py` (4 tests, real tokenizer). Ran over the 46-page rehearsal corpus first (99 chunks, max 454 tokens), then re-validated over the full 1,847-document corpus post-crawl: 3,495 chunks, max 509 tokens, 0 hard-limit violations.
+**Verification:** `tests/test_chunker.py` (15 tests, `FakeTokenCounter`) plus `tests/test_token_counter.py` (4 tests, real tokenizer). Ran over the 46-page rehearsal corpus first (99 chunks, max 454 tokens), then re-validated over the full corpus post-crawl. (Initial full-corpus run showed 1,847 documents/3,495 chunks; that count included 143 duplicate rows from an extraction-pipeline redirect-fan-in bug fixed under T10/T11 below — the corrected corpus is 1,699 documents / 3,237 chunks, max 509 tokens, 0 hard-limit violations.)
 
 **Dependencies:** ~~T8~~ built and tested against the rehearsal corpus without it; `silo` stamps as `()` until T8 fills it · **Scope:** M
 
 ## Task 10: Incremental reindex
 
 **Acceptance criteria:**
-- [ ] Content-hash diff identifies changed pages; `lastmod` used only as a cheap pre-filter
-- [ ] Changed page → delete-by-`source_url` → re-insert; no orphaned chunks
-- [ ] Unchanged corpus produces a no-op reindex
-- [ ] `corpus.lock` written with the snapshot hash
+- [x] Content-hash diff identifies changed pages; `lastmod` used only as a cheap pre-filter — `mcrag.index_pipeline.incremental_reindex`; `lastmod` is not read here at all, it's already spent as a pre-filter at T5 fetch time
+- [x] Changed page → delete-by-`source_url` → re-insert; no orphaned chunks — delete-then-upsert, driven purely through the `Indexer` interface so it's index-agnostic
+- [x] Unchanged corpus produces a no-op reindex — no indexer is touched at all when every url's hash matches the lock, not just an update that happens to write the same rows
+- [x] `corpus.lock` written with the snapshot hash — `write_lock`/`load_lock`, sha256 over sorted-key JSON
 
-**Verification:** Mutate one snapshot, rerun, confirm only that page's chunks change.
+**Verification:** `tests/test_index_pipeline.py` (5 tests, `_FakeIndexer`) covers first-run-is-all-changed, true no-op, changed-page delete+reinsert, removed-page delete-only, and lock contents. Also exercised for real by `scripts/build_indexes.py`'s first run against the full corpus (see T11).
 
 **Dependencies:** T9 · **Scope:** M
 
 ## Task 11: Build the three indexes
 
 **Acceptance criteria:**
-- [ ] LanceDB dense index over `bge-base-en-v1.5` embeddings
-- [ ] BM25 index over the same chunk set
-- [ ] Literal index supporting substring/regex with the §4c entity patterns
-- [ ] Embeddings cached on `(model_name, chunk_text_hash)`; rebuild with unchanged chunks re-embeds nothing
-- [ ] All three return chunk ids joinable to metadata
+- [x] LanceDB dense index over `bge-base-en-v1.5` embeddings — `mcrag.retrieval.dense.DenseIndex` + `mcrag.retrieval.bge_embedder.BgeEmbedder`
+- [x] BM25 index over the same chunk set — `mcrag.retrieval.bm25.BM25Index` (`rank_bm25.BM25Okapi`)
+- [x] Literal index supporting substring/regex with the §4c entity patterns — `mcrag.retrieval.literal.LiteralIndex`, entity patterns verbatim from §4c (course_code/form/money); only fires when the query itself matches one
+- [x] Embeddings cached on `(model_name, chunk_text_hash)`; rebuild with unchanged chunks re-embeds nothing — `mcrag.retrieval.embedding_cache.EmbeddingCache`, flat append-only JSONL
+- [x] All three return chunk ids joinable to metadata — each `Retriever.search` returns `Hit(chunk_id=...)`, joinable back to `corpus/chunks.jsonl`
 
-**Verification:** Query all three with a known course code; confirm the literal index returns exact hits.
+**Verification:** `tests/test_retrieval_literal.py` (5), `tests/test_retrieval_bm25.py` (4), `tests/test_embedding_cache.py` (3), `tests/test_retrieval_dense.py` (5, fake embedder, no model download in tests) — all pass. Built for real over the full corpus via `scripts/build_indexes.py`: 1,699 documents / 3,237 chunks, `1699 changed, 0 removed, 3237 chunks written` on a from-scratch run; dense index verified to have exactly 3,237 rows with 3,237 unique `chunk_id`s (no duplicates). Full suite: 266 passed.
+
+**Note:** the first run of `scripts/build_indexes.py` reported 1699 changed / 4061 chunks written against an 1847-document corpus — a red flag caught before committing. Root cause: `mcrag/extract/pipeline.py`'s `extract_all` produced one `Document` per manifest record with no dedup on canonical URL, so 143 cases of two different requested URLs redirecting to the same final page each wrote a duplicate row to `corpus/extracted/documents.jsonl`. Fixed by deduping in `extract_all` (prefer the non-redirected request, else the most recently fetched); `scripts/extract_corpus.py`, `scripts/chunk_corpus.py`, and `scripts/build_indexes.py` were then re-run clean.
 
 **Dependencies:** T9 · **Scope:** M
 
