@@ -36,7 +36,8 @@ htmlcov/
 # Raw page snapshots: large, regenerable, and not the deliverable.
 # corpus/manifest.jsonl is the accounting record and IS tracked.
 corpus/raw/
-corpus/.crawl_pass.json      # crawl resume state, local to a machine
+# crawl resume state, local to a machine
+corpus/.crawl_pass.json
 corpus/extracted/
 *.warc
 *.warc.gz

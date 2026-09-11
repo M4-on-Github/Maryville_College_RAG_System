@@ -12,12 +12,12 @@ Design rationale lives in `PLAN.md`.
 
 ## Phase 1 — Corpus
 - [x] T4 · Sitemap parser → **crawl manifest** (M) — one record per URL *considered*, reason on every omission
-- [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl launched 2026-09-10, running in background** (`runs/full_crawl.log`)
-- [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD
-- [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M) — needs the full crawl to finish
-- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002); needs the full crawl to finish
+- [x] T5 · Polite fetcher + raw snapshot store (M) — code + tests done; **full live crawl completed 2026-09-10**, 77.1 min, 2189 changed/new, 210 failed (all one server-side infinite-redirect loop on the staff sitemap, confirmed not a fetcher bug), 0 robots-refused (`runs/full_crawl.log`, `docs/coverage.md` regenerated)
+- [x] T6 · Extraction + regression snapshot test (M) — + corpus-level boilerplate filter; breadcrumbs come from the site's JSON-LD; re-run over the full crawl: 2243 snapshots -> 1847 documents
+- [ ] T7 · SmartCatalogIQ nav-tree adapter + terms check (M) — full crawl is in; ready to start
+- [ ] T8 · **Silo discovery + mapper + contact-routing table** (M) — absorbs former T8b; routing table gains a referral destination column (decision 0002); full crawl is in; ready to start
 - [ ] ~~T8b · Office contact-routing table~~ — **merged into T8.** It is a byproduct of discovery step 3, not follow-on work
-- [x] T9 · Heading-aware chunker + metadata stamping (M) — built as paragraph-boundary chunking, not heading-boundary (measured heading sparsity, see `tasks/plan.md`); `silo` stamps `()` until T8 runs
+- [x] T9 · Heading-aware chunker + metadata stamping (M) — built as paragraph-boundary chunking, not heading-boundary (measured heading sparsity, see `tasks/plan.md`); re-validated against the full 1847-document corpus (3495 chunks, max 509 tokens, 0 violations); `silo` stamps `()` until T8 runs
 - [ ] T10 · Incremental reindex (M)
 - [ ] T11 · Build dense + BM25 + literal indexes (M)
 - [ ] **Checkpoint B** — corpus indexed, chunks reviewed, coverage reconciled

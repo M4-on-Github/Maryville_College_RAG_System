@@ -398,11 +398,11 @@ needs to learn about.
 
 **Acceptance criteria:**
 - [x] ~~Chunks respect H2/H3 boundaries~~ Chunks respect paragraph boundaries (see above); cap 400 tokens, ~15% overlap
-- [x] **No chunk exceeds the embedder's 512-token limit** (asserted per chunk in `chunk()`, not assumed — verified against real `bge-base-en-v1.5` tokenizer over all 46 rehearsal documents: 99 chunks, max 454 tokens, 0 violations)
+- [x] **No chunk exceeds the embedder's 512-token limit** (asserted per chunk in `chunk()`, not assumed — verified against real `bge-base-en-v1.5` tokenizer over the full 1,847-document corpus: 3,495 chunks, max 509 tokens, 0 violations)
 - [x] Every chunk carries: `source_url`, `title`, `breadcrumb`, `silo`, `heading_path`, `crawled_at`, `content_hash`, `catalog_year` (`heading_path` is `(doc.title,)` until the extractor preserves real headings)
 - [x] `chunk_size` (`max_tokens`) and overlap are config-driven constructor args, not constants
 
-**Verification:** `tests/test_chunker.py` (15 tests, `FakeTokenCounter`) plus `tests/test_token_counter.py` (4 tests, real tokenizer). Ran over the 46-page rehearsal corpus: 99 chunks, max 454 tokens, 0 hard-limit violations.
+**Verification:** `tests/test_chunker.py` (15 tests, `FakeTokenCounter`) plus `tests/test_token_counter.py` (4 tests, real tokenizer). Ran over the 46-page rehearsal corpus first (99 chunks, max 454 tokens), then re-validated over the full 1,847-document corpus post-crawl: 3,495 chunks, max 509 tokens, 0 hard-limit violations.
 
 **Dependencies:** ~~T8~~ built and tested against the rehearsal corpus without it; `silo` stamps as `()` until T8 fills it · **Scope:** M
 
