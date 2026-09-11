@@ -1,0 +1,26 @@
+path_prefix,candidate_url,email,phone,confidence
+academics/course,,,,no email found in top-5 shortest pages
+academics/faculty,https://www.maryvillecollege.edu/academics/faculty/jbay/,jeff.bay@maryvillecollege.edu,865-981-8023,low (heuristic: shortest page under prefix with an email)
+academics/programs-of-study,,,,no email found in top-5 shortest pages
+campus-life/student-services,https://www.maryvillecollege.edu/campus-life/student-services/dining/,student.affairs@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+academics/resources,,,,no email found in top-5 shortest pages
+alumni/stay-connected,https://www.maryvillecollege.edu/alumni/stay-connected/,alumni@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+admissions/finaid,,,,no email found in top-5 shortest pages
+news/divisions,,,,no email found in top-5 shortest pages
+about/inside,https://www.maryvillecollege.edu/about/inside/woods/,woods@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+international/studyabroad,https://www.maryvillecollege.edu/international/studyabroad/faq/,studyabroad@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+academics/learn-by-experience,https://www.maryvillecollege.edu/academics/learn-by-experience/scots-science-scholars/,maria.siopsis@maryvillecollege.edu,865-273-8163,low (heuristic: shortest page under prefix with an email)
+alumni/events,,,,no email found in top-5 shortest pages
+academics/divisions,,,,no email found in top-5 shortest pages
+news/publications,,,,no email found in top-5 shortest pages
+academics/registrar,https://www.maryvillecollege.edu/academics/registrar/,registrar@maryvillecollege.edu,865-981-8212,low (heuristic: shortest page under prefix with an email)
+about/speakers-experts,,,,no email found in top-5 shortest pages
+about/faith,https://www.maryvillecollege.edu/about/faith/jessica-lewis/,jessica.lewis@maryvillecollege.edu,865-981-8470,low (heuristic: shortest page under prefix with an email)
+campus-life/community-engagement-center,https://www.maryvillecollege.edu/campus-life/community-engagement-center/mlk25/,community.engagement@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+admissions/counselors,https://www.maryvillecollege.edu/admissions/counselors/evelyn-hess/,evelyn.hess@maryvillecollege.edu,865-981-8198,low (heuristic: shortest page under prefix with an email)
+international/admissions,https://www.maryvillecollege.edu/international/admissions/costs/,international@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+news/department,,,,no email found in top-5 shortest pages
+about/community-education,https://www.maryvillecollege.edu/about/community-education/gse/,andrew.gunnoe@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+academics/career-center,https://www.maryvillecollege.edu/academics/career-center/events/,careercenter@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+campus-life/reslife,https://www.maryvillecollege.edu/campus-life/reslife/dates/,residence.life@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
+international/iss,https://www.maryvillecollege.edu/international/iss/,international@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
