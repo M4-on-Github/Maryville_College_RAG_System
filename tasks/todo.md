@@ -23,7 +23,7 @@ Design rationale lives in `PLAN.md`.
 - [ ] **Checkpoint B** — corpus indexed, chunks reviewed, coverage reconciled
 
 ## Phase 2 — Gold set
-- [ ] T12 · Gold-set schema + split tooling (M) — schema carries an expected referral; refusal correctness splits into refused-correctly and routed-correctly (decision 0002)
+- [x] T12 · Gold-set schema + split tooling (M) — `mcrag/eval/gold.py`, `mcrag.types.GoldQuestion`; schema carries an expected referral; refusal correctness splits into refused-correctly and routed-correctly (decision 0002); did not need T8's final `offices.yaml` to build
 - [ ] T13 · Author ~300 questions (L — split by slice, incl. the ~15 multi-turn slice)
 - [ ] **Checkpoint C** — dataset validated, split, locked
 

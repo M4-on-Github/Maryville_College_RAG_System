@@ -460,15 +460,24 @@ needs to learn about.
 ## Task 12: Gold-set schema + split tooling
 
 **Description:** Build the container before writing 300 questions into it.
-Retrofitting granularity or conjunctive flags later is miserable.
+Retrofitting granularity or conjunctive flags later is miserable. Does not
+depend on T8's final `offices.yaml` — `expected_referral` is a free-text field
+on the schema; it gets populated with real office data when T13 authors
+questions against a finalized `offices.yaml`, not before.
 
 **Acceptance criteria:**
-- [ ] Schema: `qid`, `slice`, `question`, `gold` (list of **heading/chunk-level** refs, not bare page URLs), `conjunctive: bool`, `notes`
-- [ ] Stratified 40/20/40 split, deterministic from a seed, proportional within every slice
-- [ ] `split.lock` records split hash and which split a run scored
-- [ ] Test-access counter that must be incremented explicitly
+- [x] Schema: `qid`, `slice`, `question`, `gold` (list of **heading/chunk-level** refs, not bare page URLs), `conjunctive: bool`, `notes` — `mcrag.types.GoldQuestion`. Plus decision 0002's field, `expected_referral: str | None`, so refusal correctness can split into refused-correctly and routed-correctly.
+- [x] Stratified 40/20/40 split, deterministic from a seed, proportional within every slice — `mcrag.eval.gold.stratified_split`, one `random.Random(f"{seed}:{slice}")` per slice so slices don't perturb each other's draws
+- [x] `split.lock` records split hash and which split a run scored — `write_split_lock`/`load_split_lock`, hash is order-independent (sorted-key JSON, sha256)
+- [x] Test-access counter that must be incremented explicitly — `TestAccessCounter`; only moves on `.increment(reason)`, logs reason + UTC timestamp, never as a side effect of an unrelated read
+- [x] `SLICE_TARGETS` encodes PLAN's seven-slice targets (single_silo 80, cross_silo 70, out_of_scope 60, temporal/exact_match/adversarial 25 each, multi_turn 15 — sums to 300) as the single source of truth `validate()` checks slice names against
+- [x] `validate()` also enforces two structural rules from PLAN/decision 0002 that aren't in the literal T12 bullet list but are load-bearing: `out_of_scope` questions carry no gold refs (there is nothing to cite for an unanswerable question), and `conjunctive: true` requires ≥2 gold refs (a conjunctive claim needs something to conjoin)
 
-**Verification:** Re-running the splitter with the same seed produces an identical split hash.
+**Verification:** `tests/test_gold.py` (12 tests) — re-running the splitter with
+the same seed produces an identical split hash; a different seed can differ;
+split proportions land exactly 4/2/4 on a 10-question slice; split-lock and
+gold-question JSONL round-trip losslessly; the access counter only advances on
+an explicit call.
 
 **Dependencies:** T1 · **Scope:** M
 

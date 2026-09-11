@@ -96,6 +96,27 @@ class Hit:
 
 
 @dataclass(frozen=True, slots=True)
+class GoldQuestion:
+    """One hand-authored gold-set record (Task 12).
+
+    `gold` holds heading/chunk-level refs, never bare page URLs (PLAN Phase 2)
+    -- a page-level ref can't tell a correct retrieval from a lucky one.
+    `expected_referral` is decision 0002's field: the office/contact/destination
+    a correct answer or refusal should route to, where one applies. Empty for
+    slices that don't reach a silo (e.g. most `out_of_scope` questions).
+    """
+
+    qid: str
+    slice: str
+    question: str
+    gold: tuple[str, ...]
+    conjunctive: bool
+    notes: str = ""
+    expected_referral: str | None = None
+    split: str | None = None  # filled in by the splitter, absent before that
+
+
+@dataclass(frozen=True, slots=True)
 class Score:
     """A graded judgement of one answer against one gold record.
 
