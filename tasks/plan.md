@@ -331,20 +331,35 @@ exits non-zero above a 20% empty share.
 
 **Dependencies:** T5 · **Scope:** M
 
-## Task 7: SmartCatalogIQ nav-tree crawler adapter
+## Task 7: Catalog coverage assessment (was: SmartCatalogIQ nav-tree crawler adapter)
 
-**Description:** Different platform, different DOM, **and no sitemap** — URLs
-must be discovered by walking the catalog navigation tree.
+**What decision 0001 settled that PLAN left open.** The acceptance criteria
+below assumed a separate SmartCatalogIQ host with no sitemap, needing
+nav-tree discovery. Measured false on 2026-09-10: the catalog is three
+WordPress custom post types on `www.maryvillecollege.edu` itself
+(`smart_catalog_course`, `_block`, `_prog`), already enumerated by
+`wp-sitemap.xml` and already covered by the ordinary sitemap-driven crawl
+(T4/T5). There is no separate host, no missing sitemap, and no nav tree to
+walk — so there is nothing for a nav-tree adapter to do. All three
+`smart_catalog_*` types also match a robots `Disallow` rule, so we hold no
+text from them regardless (1,146 URLs, the single largest exclusion in the
+corpus). Task 7 becomes what decision 0001 calls it: confirm what that
+exclusion costs, confirm the course-level substitute, and write the gap up.
+No terms-of-use check applies — we are not crawling that vendor surface at
+all, by any adapter.
 
-**Acceptance criteria:**
-- [ ] Catalog footer checked for terms of use; finding recorded in `decisions/`
-- [ ] Nav-tree walk discovers all 13 sections without blind recursion
-- [ ] `/sitecore/` never requested
-- [ ] **Discovered URLs enter the same `manifest.jsonl` with `source: "catalog-nav"`** — one corpus accounting, not two
-- [ ] `catalog_year` stamped on every extracted page
-- [ ] Extraction snapshot test extended with 5 catalog pages
+**Findings, verified against the completed full crawl (2026-09-10):**
+- [x] ~~Catalog footer checked for terms of use~~ — moot; see above, superseded by decision 0001
+- [x] ~~Nav-tree walk discovers all 13 sections~~ / ~~`/sitecore/` never requested~~ — no nav-tree crawl exists to do this
+- [x] ~~Discovered URLs enter `manifest.jsonl` with `source: "catalog-nav"`~~ — the sitemap-driven crawl already accounts for all `smart_catalog_*` URLs (1,146) under their own `wp-sitemap-posts-smart_catalog_*` sources, all marked `robots_disallow` — one corpus accounting, achieved for free
+- [x] **Course-level substitute confirmed:** `/academics/course/*` (772 URLs, robots-allowed) carries the same course code/title/credits/description/prerequisites data as the disallowed `smart_catalog_course` pages. 763/772 (98.8%) survived extraction with real content; the other 9 are individually thin/retired listings, not a systemic gap. Course-level questions ("what is BIO416") are answerable from the corpus.
+- [x] **Program-requirements gap confirmed, not just assumed:** sampled `academic_programs` pages (78 extracted) carry narrative program overviews ("Why minor in Accounting at MC?") but no itemized, course-by-course requirement list — that structure lives only in the disallowed `smart_catalog_prog` (138 URLs). Degree/major-requirements questions are therefore a genuine corpus gap, not a retrieval-tuning problem, and decision 0002's referral mechanism (name the Registrar's Office + the public catalog URL) is the intended handling, not a bug to fix later.
+- [ ] ~~`catalog_year` stamped on every extracted page~~ / ~~extraction snapshot test extended with 5 catalog pages~~ — deferred to T8 (silo/contact discovery), which is where `catalog_year` stamping is actually driven from; no separate catalog extraction path exists to test
 
-**Verification:** Discovered URL count matches manual section count; snapshot tests pass.
+**Verification:** Manifest reconciliation (T4/T6, already passing) accounts for
+all 1,146 `smart_catalog_*` URLs as `robots_disallow`. Course-substitute and
+program-gap claims verified by direct sampling of `corpus/extracted/documents.jsonl`
+against the completed 1,847-document corpus, 2026-09-10.
 
 **Dependencies:** T2, T6 · **Scope:** M
 
