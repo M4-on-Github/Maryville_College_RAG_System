@@ -1,0 +1,292 @@
+# Task 8 step 4 -- silo -> office -> contact -> referral destination.
+#
+# Decision 0002: this table is small, hand-checked, and reviewable in a
+# sitting. Every non-`other` silo in silos.yaml MUST have a row here (asserted
+# by tests). `destination_url` is the one page a person should land on for a
+# referral -- it is never quoted from and never treated as a citation
+# (decision 0002); it may point at a page we hold no chunk for.
+#
+# Source column values:
+#   division-office-block  -- /directories/department/'s own structured
+#                              office listing (scripts/match_offices.py),
+#                              confidence: high
+#   heuristic + human review -- scripts/match_offices.py's candidate search,
+#                              corrected by hand (data/office_candidates.csv)
+#   manual corpus search    -- found by grepping the extracted corpus for a
+#                              known office's contact after the heuristic's
+#                              top-5-shortest-page search missed it
+#
+# See decisions/0003-silo-taxonomy.md for the judgment call behind every
+# non-"high" row.
+
+offices:
+  - silo: academics_humanities
+    contact_name: Wendy Specter
+    contact_title: Administrative Assistant
+    building: Anderson Hall
+    email: wendy.specter@maryvillecollege.edu
+    phone: "865-981-8224"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/humanities/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics_behavioral_sciences
+    contact_name: Gayle Gould
+    contact_title: Administrative Assistant
+    building: Sutton Science Center
+    email: gayle.gould@maryvillecollege.edu
+    phone: "865-981-8274"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/behavioral-sciences/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics_math_natural_sciences
+    contact_name: Paula Marlow
+    contact_title: Administrative Assistant
+    building: Sutton Science Center
+    email: paula.marlow@maryvillecollege.edu
+    phone: "865-981-8164"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/natural-sciences/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics_fine_arts
+    contact_name: Deborah Boling
+    contact_title: Office Manager and Event Coordinator
+    building: Clayton Center for the Arts, Main Building
+    email: deborah.boling@maryvillecollege.edu
+    phone: "865-981-8150"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/fine-arts/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics_social_sciences
+    contact_name: Tammy Brown
+    contact_title: Administrative Assistant
+    building: Thaw Hall
+    email: tammy.brown@maryvillecollege.edu
+    phone: "865-981-8302"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/social-sciences/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics_education_health_outdoor
+    contact_name: Ramona Crawford
+    contact_title: Administrative Assistant
+    building: Fayerweather Hall
+    email: ramona.crawford@maryvillecollege.edu
+    phone: "865-981-8109"
+    destination_url: https://www.maryvillecollege.edu/academics/divisions/education/
+    source: division-office-block
+    confidence: high
+
+  - silo: academics
+    contact_name: null
+    contact_title: Registrar's Office
+    building: null
+    email: registrar@maryvillecollege.edu
+    phone: "865-981-8212"
+    destination_url: https://www.maryvillecollege.edu/academics/registrar/
+    source: heuristic + human review
+    confidence: low (heuristic; registrar chosen as the site's office of
+      record for the catalog/course content this silo's pages carry, not
+      itself a per-page match)
+
+  - silo: career_center
+    contact_name: null
+    contact_title: Career Center
+    building: null
+    email: careercenter@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/academics/career-center/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: learn_by_experience
+    contact_name: Maria Siopsis
+    contact_title: Scots Science Scholars program coordinator
+    building: null
+    email: maria.siopsis@maryvillecollege.edu
+    phone: "865-273-8163"
+    destination_url: https://www.maryvillecollege.edu/academics/learn-by-experience/
+    source: heuristic + human review
+    confidence: low (named program coordinator, confirmed by human review as
+      an acceptable single point of contact for this program)
+
+  - silo: admissions
+    contact_name: null
+    contact_title: Admissions Office
+    building: null
+    email: admissions@maryvillecollege.edu
+    phone: "800-597-2687"
+    destination_url: https://www.maryvillecollege.edu/admissions/apply/
+    source: manual corpus search
+    confidence: high (generic office address and toll-free number, found on
+      the application pages; missed by the heuristic because it only checked
+      the top-5 shortest pages under the prefix)
+
+  - silo: finaid
+    contact_name: null
+    contact_title: Financial Aid Office
+    building: null
+    email: financialaid@maryvillecollege.edu
+    phone: "865-981-8100"
+    destination_url: https://www.maryvillecollege.edu/admissions/finaid/
+    source: manual corpus search
+    confidence: high (generic office address, same reason the heuristic missed it)
+
+  - silo: iss
+    contact_name: null
+    contact_title: International Student Services / International Admissions
+    building: null
+    email: international@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/international/iss/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: study_abroad
+    contact_name: null
+    contact_title: Study Abroad Office
+    building: null
+    email: studyabroad@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/international/studyabroad/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: alumni
+    contact_name: null
+    contact_title: Alumni Relations
+    building: null
+    email: alumni@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/alumni/stay-connected/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: residential
+    contact_name: null
+    contact_title: Residence Life
+    building: null
+    email: residence.life@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/campus-life/reslife/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: student_services
+    contact_name: null
+    contact_title: Student Affairs
+    building: null
+    email: student.affairs@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/campus-life/student-services/
+    source: heuristic + human review
+    confidence: low (heuristic; student_health and disability topics route
+      here too until a more specific contact is found -- see decisions/0003)
+
+  - silo: community_engagement
+    contact_name: null
+    contact_title: Community Engagement Center
+    building: null
+    email: community.engagement@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/campus-life/community-engagement-center/
+    source: heuristic + human review
+    confidence: low (heuristic)
+
+  - silo: title_ix
+    contact_name: null
+    contact_title: Title IX Coordinator
+    building: null
+    email: titleix@maryvillecollege.edu
+    phone: "865-981-8111"
+    destination_url: https://www.maryvillecollege.edu/about/inside/titleix/
+    source: manual corpus search
+    confidence: high (dedicated Title IX page with its own contact address)
+
+  - silo: governance
+    contact_name: null
+    contact_title: Inside MC / governance
+    building: null
+    email: woods@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/about/inside/woods/
+    source: heuristic + human review
+    confidence: low (heuristic; confirmed by human review over the
+      alternative of dropping it as a personal-page false positive)
+
+  - silo: faith_life
+    contact_name: Jessica Lewis
+    contact_title: Chaplain
+    building: null
+    email: jessica.lewis@maryvillecollege.edu
+    phone: "865-981-8470"
+    destination_url: https://www.maryvillecollege.edu/about/faith/
+    source: heuristic + human review
+    confidence: low (named individual, confirmed by human review as an
+      acceptable contact for the chaplain's office)
+
+  - silo: community_education
+    contact_name: Andrew Gunnoe
+    contact_title: Community-education program contact
+    building: null
+    email: andrew.gunnoe@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/about/community-education/
+    source: heuristic + human review
+    confidence: low (named program coordinator, confirmed by human review)
+
+  - silo: partnerships
+    contact_name: null
+    contact_title: Partnerships (internships, employer connections)
+    building: null
+    email: partnerships@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/about/connect-to-mc/
+    source: manual corpus search
+    confidence: high (generic office address)
+
+  - silo: giving
+    contact_name: Eric Bellah
+    contact_title: Gift planning
+    building: null
+    email: eric.bellah@maryvillecollege.edu
+    phone: "865-981-8225"
+    destination_url: https://www.maryvillecollege.edu/giving/ways-to-give/
+    source: manual corpus search
+    confidence: medium (named individual, but a generic role title and the
+      only contact found across the whole prefix)
+
+  - silo: families
+    contact_name: null
+    contact_title: Family Programs
+    building: null
+    email: FamilyInfo@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/families/
+    source: manual corpus search
+    confidence: high (generic office address, matches the site's own "Families"
+      top-level nav item)
+
+  - silo: event_operations
+    contact_name: null
+    contact_title: Event Operations
+    building: null
+    email: events@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/events/resources/
+    source: manual corpus search
+    confidence: high (generic office address, matches the site's own "Event
+      Operations" top-level nav item)
+
+  - silo: orientation
+    contact_name: null
+    contact_title: New Student Orientation
+    building: null
+    email: orientation@maryvillecollege.edu
+    phone: ""
+    destination_url: https://www.maryvillecollege.edu/orientation/new-scots/
+    source: manual corpus search
+    confidence: high (generic office address)

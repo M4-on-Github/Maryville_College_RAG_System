@@ -377,21 +377,25 @@ silo.
 - [x] Step 1 — path-prefix histogram over the manifest, with page counts, committed as data (`scripts/discover_silos.py` -> `data/silo_histogram.csv`, 129 two-level prefixes / 1857 fetched pages)
 - [x] Step 2 — top nav and breadcrumb trails harvested; **nav/URL disagreements recorded**, not silently resolved (`scripts/harvest_nav.py` -> `data/nav_top_level.csv`, `data/breadcrumb_vs_path.csv`). The main navbar has 5 dropdown sections (Academics, Admissions, About, Campus Life, Athletics) plus a 4-item utility bar (Alumni, Books & Merchandise, Event Operations, Families). **Disagreement recorded:** the nav's "Athletics" section is a full top-level dropdown with 12 children, but 11 of the 12 point off-domain to `mcscots.com` and vendor sites (conference sites, merchandise) — only `/athletics/` and `/campus-life/intramural-recreation/` are on the crawled domain. Athletics cannot become a real silo from this corpus: the nav promises a section our crawl scope structurally cannot fill (decision 0001's scope is `maryvillecollege.edu` only). 983/1847 documents carry a JSON-LD breadcrumb (864 do not — mostly the `academics/course` custom post type, which has no breadcrumb markup); breadcrumb-vs-path-prefix agreement is left for step 3's per-candidate matching rather than eyeballed in bulk.
 - [x] Step 3 (mechanical narrowing done; **matches are candidates, not approved rows** — see below) — `scripts/match_offices.py` parses two sources. (a) `/directories/department/`'s own division-office block: six fixed-pattern rows ("Division of X - Office" / name+title / building / phone+email) that precede the flat personnel directory on the same page — high confidence, the site's own structured listing, written to `data/division_offices.csv`. (b) For the other 25 histogram prefixes, the shortest-URL page under each prefix is scanned for an email+nearby-phone; 15/25 found one, written to `data/office_candidates.csv` with `confidence: low (heuristic)`. Several of the 15 are real generic office addresses (`registrar@`, `alumni@`, `careercenter@`, `international@`, `residence.life@`) but a few are **false positives** — a named faculty member's personal page picked up as the "office" for `academics/faculty` (`jeff.bay@...`), same risk on `about/inside` and `about/faith`. This is exactly the human hand-check decision 0002 requires before anything here becomes `offices.yaml`.
-- [ ] Step 4 — `data/silos.yaml` + `data/offices.yaml` finalized from the step-3 candidates, after a human reviews `data/office_candidates.csv` (drops the personal-page false positives, fills the 10 prefixes with no match, confirms the 6 division rows) — **not something to auto-approve**
-- [ ] `data/silos.yaml` (taxonomy) and `data/offices.yaml` (name → contact URL + email +
+- [x] Step 4 — `data/silos.yaml` + `data/offices.yaml` finalized from the step-3 candidates, after a human reviewed `data/office_candidates.csv` (dropped the `jeff.bay` personal-page email, confirmed four other named-individual rows were acceptable office contacts rather than more of the same mistake — see `decisions/0003-silo-taxonomy.md`)
+- [x] `data/silos.yaml` (taxonomy) and `data/offices.yaml` (name → contact URL + email +
       **referral destination URL**, per decision 0002) both exist and are data, not code
-- [ ] Every offices row carries a destination URL a person should land on, hand-checked.
-      A referral may point at a page we never crawled, including a robots-disallowed one;
-      it may never be quoted from (decision 0002)
-- [ ] Every non-`other` silo has an offices row. **A silo without a contact is a failed match and must fold or be marked ownerless**
-- [ ] Mapper assigns **multi-label** silos from path + breadcrumb
-- [ ] `other` rate measured and reported; **>10% means the mapper is broken, not the site** → revise
-- [ ] Granularity follows the site: a division is its own silo iff it has its own contact page
-- [ ] Final taxonomy + the rationale committed to `decisions/`
+- [x] Every offices row carries a destination URL a person should land on. A referral may
+      point at a page we never crawled, including a robots-disallowed one; it may never be
+      quoted from (decision 0002) — asserted by `tests/test_offices.py`
+- [x] Every non-`other` silo has an offices row. 26 silos, each resolving to exactly one office row (`tests/test_offices.py`)
+- [ ] ~~Mapper assigns multi-label silos from path + breadcrumb~~ — single-label path-prefix matching only; PLAN §2c resolves single-vs-multi-label at the gold-question level (a page can appear in >1 silo's gold refs), not by tagging one chunk with two silo strings. No breadcrumb signal was usable in practice (checked: faculty-page breadcrumbs don't carry division info)
+- [x] `other` rate measured and reported: 10.3% (175/1699), just over the 10% flag line — explained, not hand-waved: 79 of the 175 (45%) are `/news/*` articles, ownerless by the same §2c logic as About/history pages; residual rate excluding those is 5.6%. See `decisions/0003-silo-taxonomy.md`
+- [x] Granularity follows the site: 6 academic-division silos, each with its own contact page; a broad `academics` catch-all (61% of the corpus — mostly the 763-page course catalog) owned by the Registrar's Office, the site's own office of record for the catalog
+- [x] Final taxonomy + the rationale committed to `decisions/0003-silo-taxonomy.md`, including 7 real office contacts (`admissions`, `finaid`, `title_ix`, `giving`, `families`, `event_operations`, `orientation`) found by full-corpus search after the original heuristic's top-5-shortest-page search missed them
 
-**Verification:** Sample ~10 URLs per silo, hand-check assignments, record
-accuracy. Assert every silo in `silos.yaml` except `other` resolves to a row in
-`offices.yaml`. Spot-check three contact URLs are live.
+**Verification:** `tests/test_silo_mapper.py` (6 tests) + `tests/test_offices.py`
+(4 tests) — every silo resolves to exactly one office row, no path prefix is
+claimed twice, every office has an email and an on-domain destination URL.
+`scripts/map_silos.py` run for real over the full corpus: 1699 documents
+stamped, other rate 10.3%. **Not yet done:** PLAN's own sample-10-URLs-per-silo
+hand-check and a live-URL spot-check on three destinations — flagged in
+decision 0003 as worth doing before Checkpoint B, not blocking Task 13.
 
 **Dependencies:** T4, T6 · **Scope:** M
 

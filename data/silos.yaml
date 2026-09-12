@@ -1,0 +1,186 @@
+# Task 8 step 4 -- the final silo taxonomy.
+#
+# A silo is a topic that has an office with a published contact page (PLAN
+# Sec 2c). Every silo below except `other` MUST resolve to a row in
+# `offices.yaml` -- that invariant is asserted by tests, not just documented.
+#
+# `path_prefixes` are matched against a document's URL path (site base
+# stripped, leading/trailing slashes stripped) by longest-prefix match across
+# the WHOLE table -- a page matches the most specific rule that applies, not
+# just the first one written down. A path that matches no rule is `other`.
+#
+# Multi-label is not implemented via extra rules here: PLAN Sec 2c resolves
+# the single-vs-multi-label question at chunk/page level (a page can appear in
+# more than one silo's gold refs), not by tagging one chunk with two silo
+# strings. See decisions/0003-silo-taxonomy.md for the discovery method, the
+# call on every judgment-call row, and the measured `other` rate.
+
+silos:
+  # ---- Academic divisions: each has its own contact page in the
+  # /directories/department/ division-office block (high confidence). One
+  # silo per division, granularity following the site exactly (Sec 2c).
+  - name: academics_humanities
+    description: Division of Humanities and Languages & Literature
+    path_prefixes:
+      - academics/divisions/humanities
+      - academics/divisions/languages-literature
+
+  - name: academics_behavioral_sciences
+    description: Division of Behavioral Sciences
+    path_prefixes:
+      - academics/divisions/behavioral-sciences
+
+  - name: academics_math_natural_sciences
+    description: Division of Math & Computer Science and Natural Sciences
+    path_prefixes:
+      - academics/divisions/math-compsci
+      - academics/divisions/natural-sciences
+
+  - name: academics_fine_arts
+    description: Division of Fine Arts
+    path_prefixes:
+      - academics/divisions/fine-arts
+
+  - name: academics_social_sciences
+    description: Division of Social Sciences
+    path_prefixes:
+      - academics/divisions/social-sciences
+
+  - name: academics_education_health_outdoor
+    description: Division of Education and Health Sciences & Outdoor Studies
+    path_prefixes:
+      - academics/divisions/education
+      - academics/divisions/health-sciences-outdoor-studies
+
+  # ---- Broad academic catch-all. The course catalog (763 pages), program
+  # overviews, faculty directory, and the divisions hub page are all academic
+  # content that no single division or program owns individually; the
+  # Registrar's Office is the site's own office of record for the catalog
+  # (already the referral target T7 named for the program-requirements gap).
+  # This one rule is why the corpus is 61% "academics" -- the site itself is
+  # catalog-heavy, not a mapper defect. See decisions/0003.
+  - name: academics
+    description: Registrar / general academic catalog, programs, faculty directory
+    path_prefixes:
+      - academics/registrar
+      - academics/course
+      - academics/programs-of-study
+      - academics/resources
+      - academics/divisions
+      - academics/faculty
+
+  - name: career_center
+    description: Career development and employer connections
+    path_prefixes:
+      - academics/career-center
+
+  - name: learn_by_experience
+    description: Experiential-learning programs (e.g. Scots Science Scholars)
+    path_prefixes:
+      - academics/learn-by-experience
+
+  - name: admissions
+    description: Undergraduate admissions (application, counselors, visiting)
+    path_prefixes:
+      - admissions/apply
+      - admissions/counselors
+      - admissions/visit
+      - admissions/events
+      - admissions
+
+  - name: finaid
+    description: Financial aid
+    path_prefixes:
+      - admissions/finaid
+
+  - name: iss
+    description: International admissions and international student services
+    path_prefixes:
+      - international/iss
+      - international/admissions
+      - international/globalplus
+
+  - name: study_abroad
+    description: Study abroad (MC students going elsewhere)
+    path_prefixes:
+      - international/studyabroad
+
+  - name: alumni
+    description: Alumni relations
+    path_prefixes:
+      - alumni/stay-connected
+      - alumni/events
+      - alumni/association
+      - alumni
+
+  - name: residential
+    description: Residence life
+    path_prefixes:
+      - campus-life/reslife
+
+  - name: student_services
+    description: >-
+      Student affairs / student services, general. student_health and
+      disability are real topics with no discovered dedicated contact page of
+      their own yet -- they fold in here rather than becoming their own silo
+      or falsely inheriting an unrelated one. See decisions/0003.
+    path_prefixes:
+      - campus-life/student-services
+
+  - name: community_engagement
+    description: Community Engagement Center
+    path_prefixes:
+      - campus-life/community-engagement-center
+
+  - name: title_ix
+    description: Title IX coordinator's office
+    path_prefixes:
+      - about/inside/titleix
+
+  - name: governance
+    description: Institutional governance / "Inside MC" (quick facts, cabinet, etc.)
+    path_prefixes:
+      - about/inside
+
+  - name: faith_life
+    description: Campus ministry / chaplain's office
+    path_prefixes:
+      - about/faith
+
+  - name: community_education
+    description: Community-education programs (e.g. Great Smoky Mountains Institute)
+    path_prefixes:
+      - about/community-education
+
+  - name: partnerships
+    description: Community and employer partnerships (internships, job postings)
+    path_prefixes:
+      - about/connect-to-mc
+
+  - name: giving
+    description: Advancement / gift planning
+    path_prefixes:
+      - giving
+
+  - name: families
+    description: Family programs (a top-level nav utility-bar section)
+    path_prefixes:
+      - families
+
+  - name: event_operations
+    description: Event Operations (a top-level nav utility-bar section)
+    path_prefixes:
+      - events
+
+  - name: orientation
+    description: New-student orientation
+    path_prefixes:
+      - orientation
+
+# `other` is not listed above: it is the mapper's default for anything that
+# matches no rule, and it MUST NOT have a row in offices.yaml (there is
+# nothing to route a refusal to). Measured at 10.3% of the corpus, just over
+# PLAN's 10% flag line; decisions/0003-silo-taxonomy.md breaks down why (79 of
+# the 175 "other" pages, 45%, are /news/* articles -- ownerless by the same
+# logic as About/history pages, Sec 2c -- residual rate excluding those is
+# 5.6%).

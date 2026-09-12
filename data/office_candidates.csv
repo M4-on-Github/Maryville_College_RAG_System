@@ -1,6 +1,6 @@
 path_prefix,candidate_url,email,phone,confidence
 academics/course,,,,no email found in top-5 shortest pages
-academics/faculty,https://www.maryvillecollege.edu/academics/faculty/jbay/,jeff.bay@maryvillecollege.edu,865-981-8023,low (heuristic: shortest page under prefix with an email)
+academics/faculty,https://www.maryvillecollege.edu/academics/faculty/jbay/,,865-981-8023,low (heuristic: shortest page under prefix with an email)
 academics/programs-of-study,,,,no email found in top-5 shortest pages
 campus-life/student-services,https://www.maryvillecollege.edu/campus-life/student-services/dining/,student.affairs@maryvillecollege.edu,,low (heuristic: shortest page under prefix with an email)
 academics/resources,,,,no email found in top-5 shortest pages
