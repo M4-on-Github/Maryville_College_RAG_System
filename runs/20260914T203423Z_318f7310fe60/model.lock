@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "embedder": "BAAI/bge-base-en-v1.5",
+    "generator": null
+  },
+  "digest": "BAAI/bge-base-en-v1.5",
+  "kind": "model"
+}

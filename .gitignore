@@ -40,6 +40,7 @@ corpus/raw/
 corpus/.crawl_pass.json
 corpus/extracted/
 corpus/chunks.jsonl
+corpus/baseline_chunks.jsonl
 *.warc
 *.warc.gz
 
@@ -55,8 +56,19 @@ models/
 *.safetensors
 
 # Run outputs. The generated RESULTS.md is tracked; the raw run dirs are not.
-runs/
+# `runs/*` (not `runs/`) is deliberate: once a directory itself is excluded,
+# git will not re-include anything below it no matter what a later `!`
+# pattern says -- the previous `runs/` + `!runs/.gitkeep` pair looked right
+# but silently never worked (verified with `git check-ignore -v`). Ignoring
+# each *entry inside* runs/ individually is what lets a later `!` un-ignore
+# one specific run directory.
+runs/*
 !runs/.gitkeep
+# Control-condition baselines ARE committed (Task 15/20/etc.'s own acceptance
+# criterion): the reference point every ablation is measured against has to
+# be reproducible from the repo itself, not just from a RESULTS.md number.
+# Exploratory ablation run dirs (Phase 4) stay regenerable/untracked.
+!runs/20260914T203423Z_318f7310fe60/
 
 # Locks and decisions ARE tracked — they are the provenance record.
 # Listed here only to document that their exclusion would be a mistake:

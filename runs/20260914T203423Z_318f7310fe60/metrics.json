@@ -1,0 +1,252 @@
+{
+  "all_golds_retrieved@k": {
+    "ci_high": 0.7083333333333334,
+    "ci_low": 0.4166666666666667,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5625
+  },
+  "by_slice": {
+    "adversarial": {
+      "all_golds_retrieved@k": {
+        "ci_high": 0.8,
+        "ci_low": 0.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.4
+      },
+      "mrr": {
+        "ci_high": 0.7,
+        "ci_low": 0.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.3
+      },
+      "ndcg@k": {
+        "ci_high": 0.7261859507142915,
+        "ci_low": 0.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.3261859507142915
+      },
+      "recall@k": {
+        "ci_high": 0.8,
+        "ci_low": 0.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.4
+      }
+    },
+    "cross_silo": {
+      "all_golds_retrieved@k": {
+        "ci_high": 0.21428571428571427,
+        "ci_low": 0.0,
+        "n": 14,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.07142857142857142
+      },
+      "mrr": {
+        "ci_high": 0.8035714285714286,
+        "ci_low": 0.35714285714285715,
+        "n": 14,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.5797619047619048
+      },
+      "ndcg@k": {
+        "ci_high": 0.5444167454112923,
+        "ci_low": 0.2607009057646261,
+        "n": 14,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.40503653571701037
+      },
+      "recall@k": {
+        "ci_high": 0.5714285714285714,
+        "ci_low": 0.2857142857142857,
+        "n": 14,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.42857142857142855
+      }
+    },
+    "exact_match": {
+      "all_golds_retrieved@k": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      },
+      "mrr": {
+        "ci_high": 1.0,
+        "ci_low": 0.7,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.9
+      },
+      "ndcg@k": {
+        "ci_high": 1.0,
+        "ci_low": 0.7785578521428745,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.9261859507142916
+      },
+      "recall@k": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      }
+    },
+    "multi_turn": {
+      "all_golds_retrieved@k": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "n": 3,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.0
+      },
+      "mrr": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "n": 3,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.0
+      },
+      "ndcg@k": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "n": 3,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.0
+      },
+      "recall@k": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "n": 3,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.0
+      }
+    },
+    "single_silo": {
+      "all_golds_retrieved@k": {
+        "ci_high": 1.0,
+        "ci_low": 0.6875,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.875
+      },
+      "mrr": {
+        "ci_high": 0.828125,
+        "ci_low": 0.4583333333333333,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.6458333333333334
+      },
+      "ndcg@k": {
+        "ci_high": 0.8995493287946483,
+        "ci_low": 0.5509842930316255,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.7346338985538224
+      },
+      "recall@k": {
+        "ci_high": 1.0,
+        "ci_low": 0.6875,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.875
+      }
+    },
+    "temporal": {
+      "all_golds_retrieved@k": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      },
+      "mrr": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      },
+      "ndcg@k": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      },
+      "recall@k": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      }
+    }
+  },
+  "conjunctive_all_golds_retrieved@k": {
+    "ci_high": 0.21428571428571427,
+    "ci_low": 0.0,
+    "n": 14,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.07142857142857142
+  },
+  "mrr": {
+    "ci_high": 0.7326388888888888,
+    "ci_low": 0.49201388888888886,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6135416666666667
+  },
+  "ndcg@k": {
+    "ci_high": 0.7060614166306567,
+    "ci_low": 0.4828894035497252,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5976356955008796
+  },
+  "recall@k": {
+    "ci_high": 0.78125,
+    "ci_low": 0.5416666666666666,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6666666666666666
+  },
+  "run": {
+    "n_scored": "48",
+    "n_skipped": "12"
+  }
+}

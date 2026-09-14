@@ -17,17 +17,34 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from mcrag.eval.chunk_alignment import canonicalize_retrieved
 from mcrag.eval.retrieval_metrics import all_golds_retrieved_at_k, mrr, ndcg_at_k, recall_at_k
 from mcrag.eval.stats import Interval, bootstrap_ci
 from mcrag.interfaces import Retriever
 from mcrag.runlog import RunDir
-from mcrag.types import GoldQuestion
+from mcrag.types import Chunk, GoldQuestion
 
 METRIC_NAMES = ("recall@k", "mrr", "ndcg@k", "all_golds_retrieved@k")
 
 
-def evaluate_question(retriever: Retriever, question: GoldQuestion, k: int) -> dict[str, Any]:
-    """One question's retrieval metrics, or a skip record if it has no gold."""
+def evaluate_question(
+    retriever: Retriever,
+    question: GoldQuestion,
+    k: int,
+    *,
+    retrieved_lookup: dict[str, Chunk] | None = None,
+    gold_lookup: dict[str, Chunk] | None = None,
+) -> dict[str, Any]:
+    """One question's retrieval metrics, or a skip record if it has no gold.
+
+    `retrieved_lookup`/`gold_lookup` are optional: pass both when the
+    retriever's index was NOT built from the same chunk set the gold refs are
+    ids into (e.g. Task 15's fixed-512-token baseline vs the production
+    `ParagraphChunker` chunks) so a retrieved id that covers the same passage
+    as a gold chunk -- just under a different id -- is still counted as a
+    hit (`mcrag.eval.chunk_alignment`). Omit both to score a retriever
+    against its own native chunking with plain exact-id matching.
+    """
     if not question.gold:
         return {
             "query_id": question.qid,
@@ -38,6 +55,8 @@ def evaluate_question(retriever: Retriever, question: GoldQuestion, k: int) -> d
 
     hits = retriever.search(question.question, k)
     retrieved = [h.chunk_id for h in hits]
+    if retrieved_lookup is not None and gold_lookup is not None:
+        retrieved = canonicalize_retrieved(retrieved, retrieved_lookup, question.gold, gold_lookup)
 
     return {
         "query_id": question.qid,
@@ -105,13 +124,23 @@ def run(
     k: int,
     run_dir: RunDir,
     seed: int = 42,
+    *,
+    retrieved_lookup: dict[str, Chunk] | None = None,
+    gold_lookup: dict[str, Chunk] | None = None,
 ) -> dict[str, Any]:
-    """Score every question, resuming from `run_dir` if it already has records."""
+    """Score every question, resuming from `run_dir` if it already has records.
+
+    See `evaluate_question` for `retrieved_lookup`/`gold_lookup`.
+    """
     done = run_dir.completed_ids()
     for question in questions:
         if question.qid in done:
             continue
-        run_dir.append(evaluate_question(retriever, question, k))
+        run_dir.append(
+            evaluate_question(
+                retriever, question, k, retrieved_lookup=retrieved_lookup, gold_lookup=gold_lookup
+            )
+        )
 
     records = list(run_dir.records())
     metrics = summarize(records, seed=seed)

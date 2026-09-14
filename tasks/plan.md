@@ -549,12 +549,34 @@ structure PLAN anticipated is exactly what happened
 
 ## Task 15: Phase 3a retrieval baseline
 
-**Acceptance criteria:**
-- [ ] Deliberately naive config: fixed 512-tok chunks, dense-only, k=5, no literal leg, no rerank, no rewriting
-- [ ] Scored on **dev**; run dir committed as the control condition
-- [ ] `RESULTS.md` generated from `runs/` as a leaderboard
+**What running this for real found.** The first run scored an exact 0.000 on
+every metric — not a bad baseline, a bug. `FixedSizeChunker`'s 512-token
+windows produce different `chunk_id`s than the production `ParagraphChunker`
+chunks the 300 gold refs are ids into, so exact-id matching could never hit,
+regardless of retrieval quality. This is a structural problem, not a one-off:
+every future chunk-size ablation (§2c) would hit it too. Fixed by adding
+content-overlap matching (`mcrag/eval/chunk_alignment.py`) — a retrieved chunk
+is relabeled to the gold id it demonstrably covers (same `source_url`, and
+either containment or ≥50% word-set overlap) before the existing exact-match
+metric functions ever see it, so a retriever run against its *own* native
+chunking is scored identically to before (pure extension, not a behavior
+change) while a differently-chunked candidate is now scored on retrieval
+quality instead of chunk-boundary luck.
 
-**Verification:** Baseline numbers are plausible and reproducible across two runs.
+**Acceptance criteria:**
+- [x] Deliberately naive config: fixed 512-tok chunks, dense-only, k=5, no literal leg, no rerank, no rewriting — `mcrag/chunk/fixed_size_chunker.py` (`FixedSizeChunker`, no paragraph awareness, no overlap) + `scripts/build_baseline_index.py`
+- [x] Scored on **dev**; run dir committed as the control condition — `runs/20260914T203423Z_318f7310fe60/` (36K, small enough to commit outright; `.gitignore` carries an explicit exception for this one control run, future Phase 4 ablation run dirs stay untracked)
+- [x] `RESULTS.md` generated from `runs/` as a leaderboard — `mcrag/eval/results_table.py` (`scripts/generate_results.py`), extensible for Task 30's later cost column / Pareto plot rather than a throwaway
+
+**Verification:** Ran twice; `metrics.json` byte-identical both times (no
+randomness anywhere in a dense-only k=5 search plus a fixed-seed bootstrap).
+Real numbers on 48 scored dev questions (12 out_of_scope skipped, no gold to
+score): recall@5 0.667 [0.542, 0.781], MRR 0.614, nDCG@5 0.598,
+all-golds-retrieved@5 0.562 — and the conjunctive breakout lands at **0.071**
+(n=14): naive dense-only retrieval at k=5 almost never finds *both* chunks a
+cross-silo question needs. That is the project's central thesis showing up in
+the very first real number, not asserted — exactly what Phase 4's ablations
+exist to move. `tests/test_fixed_size_chunker.py` (6), `tests/test_chunk_alignment.py` (7), `tests/test_results_table.py` (5) — full suite 327 passed.
 
 **Dependencies:** T14 · **Scope:** S
 

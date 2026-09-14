@@ -29,7 +29,7 @@ Design rationale lives in `PLAN.md`.
 
 ## Phase 3 — Baselines
 - [x] T14 · Retrieval eval harness, zero quota (M) — `mcrag/eval/retrieval_metrics.py` (recall@k, MRR, nDCG, all-golds-retrieved@k) + `mcrag/eval/retrieval_harness.py` (gold set -> RunDir, resumable); out_of_scope questions skipped from retrieval scoring (no gold to score against); `tests/test_retrieval_metrics.py` (13), `tests/test_retrieval_harness.py` (5)
-- [ ] T15 · Phase 3a retrieval baseline (S)
+- [x] T15 · Phase 3a retrieval baseline (S) — naive fixed-512-tok chunks (`FixedSizeChunker`) dense-only k=5; found and fixed a real bug along the way (exact-chunk-id gold matching scored a flat 0.000 against any differently-chunked index — `mcrag/eval/chunk_alignment.py` content-overlap matching fixes it for this and every future chunk-size ablation); real dev-split numbers: recall@5 0.667, MRR 0.614, nDCG@5 0.598, all-golds-retrieved@5 0.562, **conjunctive breakout 0.071** — naive retrieval essentially never finds both chunks a cross-silo question needs, the project's thesis in its first real number. `RESULTS.md` + committed control-condition run dir
 - [ ] T16 · Phase 3b end-to-end sanity check (M) ⚠️ **risk gate**
 - [ ] T16b · **Pre-registered analysis plan + stats tooling** (M) ← *written before any Phase 4 run, worthless after*
 - [ ] 🚨 **Checkpoint D — GO/NO-GO** — does the retrieval proxy track answer quality?

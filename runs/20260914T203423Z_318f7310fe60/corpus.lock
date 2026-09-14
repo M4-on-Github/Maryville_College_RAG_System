@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "chunker": "FixedSizeChunker(512)",
+    "corpus": "corpus/extracted/documents.jsonl"
+  },
+  "digest": "d026e67b8c254c1b",
+  "kind": "corpus"
+}

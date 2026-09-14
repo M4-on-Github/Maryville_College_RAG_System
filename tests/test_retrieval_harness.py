@@ -4,10 +4,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from datetime import datetime, timezone
+
 from mcrag.config import Config
 from mcrag.eval.retrieval_harness import evaluate_question, run, summarize
 from mcrag.runlog import RunDir
-from mcrag.types import GoldQuestion, Hit
+from mcrag.types import Chunk, GoldQuestion, Hit
+
+
+def _chunk(chunk_id, text, source_url="https://example.edu/a/") -> Chunk:
+    return Chunk(
+        chunk_id=chunk_id, source_url=source_url, title="t", text=text,
+        heading_path=("t",), breadcrumb=(), silo=(), content_hash="h",
+        crawled_at=datetime(2026, 1, 1, tzinfo=timezone.utc), token_count=len(text.split()),
+    )
 
 
 class _FakeRetriever:
@@ -42,6 +52,31 @@ def test_evaluate_question_skips_questions_with_no_gold():
     record = evaluate_question(retriever, question, k=3)
     assert record["skipped"] == "no_gold_refs"
     assert "recall@k" not in record
+
+
+def test_evaluate_question_uses_content_overlap_when_lookups_given():
+    # Retriever's index uses a totally different chunk_id scheme than gold --
+    # exact-id matching alone would score this a miss even though the
+    # retrieved chunk plainly contains the gold answer.
+    retriever = _FakeRetriever({"q1": ["fixed-0", "fixed-1"]})
+    question = _q("ss-1", question="q1", gold=("g1",))
+    gold_lookup = {"g1": _chunk("g1", "financial aid deadlines are in February")}
+    retrieved_lookup = {
+        "fixed-0": _chunk("fixed-0", "Intro text. financial aid deadlines are in February. More."),
+        "fixed-1": _chunk("fixed-1", "unrelated content about dining"),
+    }
+    record = evaluate_question(
+        retriever, question, k=3, retrieved_lookup=retrieved_lookup, gold_lookup=gold_lookup
+    )
+    assert record["recall@k"] == 1.0
+    assert record["retrieved"][0] == "g1"  # canonicalized to the gold id
+
+
+def test_evaluate_question_without_lookups_is_exact_id_only():
+    retriever = _FakeRetriever({"q1": ["fixed-0"]})
+    question = _q("ss-1", question="q1", gold=("g1",))
+    record = evaluate_question(retriever, question, k=3)
+    assert record["recall@k"] == 0.0  # no lookups given -> no content-overlap relabeling
 
 
 def test_summarize_reports_conjunctive_breakout():
