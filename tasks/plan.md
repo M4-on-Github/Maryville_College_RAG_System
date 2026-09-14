@@ -528,8 +528,8 @@ structure PLAN anticipated is exactly what happened
 
 ### ✅ Checkpoint C
 - [x] 300 questions validated, split, locked — `data/gold/gold_v1.jsonl`, `data/gold/split.lock` (seed 42, stratified 40/20/40 within every slice)
-- [ ] Gold refs verified on a 20-question sample — **still needs a human**, see Task 13's verification note above
-- [ ] **Human review — this dataset is the measuring instrument for everything after**
+- [x] Gold refs verified on a 20-question sample — human reviewed `data/gold/review_sample.md`, no corrections needed
+- [x] **Human review — this dataset is the measuring instrument for everything after** — cleared
 
 ---
 
