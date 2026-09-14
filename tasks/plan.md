@@ -454,10 +454,10 @@ needs to learn about.
 **Dependencies:** T9 · **Scope:** M
 
 ### ✅ Checkpoint B
-- [ ] Full corpus crawled, extracted, chunked, indexed
-- [ ] Extraction snapshots pass; silo `other` rate acceptable
-- [ ] No chunk exceeds 512 tokens
-- [ ] **Human review of 20 random chunks for quality before building the gold set**
+- [x] Full corpus crawled, extracted, chunked, indexed — 1699 documents, 3237 chunks, dense/BM25/literal indexes built
+- [x] Extraction snapshots pass; silo `other` rate acceptable — 10.3%, explained in decision 0003 (residual 5.6% excluding ownerless `/news/*`)
+- [x] No chunk exceeds 512 tokens — verified, max 509
+- [x] **Human review of 20 random chunks for quality before building the gold set** — cleared, plus the silo-assignment sample and referral-link spot-check from decision 0003
 
 ---
 
