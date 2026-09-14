@@ -63,6 +63,11 @@ def validate(question: GoldQuestion) -> list[str]:
         problems.append(
             f"unknown provenance {question.provenance!r}; expected one of {PROVENANCE_VALUES}"
         )
+    if question.slice == "multi_turn":
+        if not question.history:
+            problems.append("multi_turn questions need at least one prior turn in history")
+    elif question.history:
+        problems.append(f"{question.slice} questions must not carry history (multi_turn only)")
     return problems
 
 
@@ -170,6 +175,7 @@ def load_gold_questions(path: Path) -> list[GoldQuestion]:
                     expected_referral=raw.get("expected_referral"),
                     split=raw.get("split"),
                     provenance=raw.get("provenance", "synthetic"),
+                    history=tuple(raw.get("history", [])),
                 )
             )
     return questions

@@ -62,6 +62,27 @@ def test_validate_rejects_unknown_provenance():
     assert any("provenance" in p for p in problems)
 
 
+def test_validate_multi_turn_requires_history():
+    q = _q("q1", slice_="multi_turn")
+    problems = validate(q)
+    assert any("history" in p for p in problems)
+
+    q_with_history = GoldQuestion(
+        qid="q1", slice="multi_turn", question="what about for international students?",
+        gold=("ref-1",), conjunctive=False, history=("Does MC offer study abroad?",),
+    )
+    assert validate(q_with_history) == []
+
+
+def test_validate_rejects_history_outside_multi_turn():
+    q = GoldQuestion(
+        qid="q1", slice="single_silo", question="q", gold=("ref-1",),
+        conjunctive=False, history=("some prior turn",),
+    )
+    problems = validate(q)
+    assert any("history" in p for p in problems)
+
+
 def test_stratified_split_is_deterministic_from_the_seed():
     questions = [_q(f"q{i}") for i in range(20)]
     a = stratified_split(questions, seed=42)
@@ -129,6 +150,17 @@ def test_gold_questions_round_trip_through_jsonl(tmp_path):
     assert loaded == questions
     assert loaded[0].provenance == "synthetic"
     assert loaded[1].provenance == "real"
+
+
+def test_multi_turn_history_round_trips_through_jsonl(tmp_path):
+    q = GoldQuestion(
+        qid="mt1", slice="multi_turn", question="what about for international students?",
+        gold=("ref-1",), conjunctive=False, history=("Does MC offer study abroad?", "Yes, ..."),
+    )
+    path = tmp_path / "gold.jsonl"
+    write_gold_questions(path, [q])
+    loaded = load_gold_questions(path)
+    assert loaded[0].history == ("Does MC offer study abroad?", "Yes, ...")
 
 
 def test_slice_targets_sum_to_roughly_300():

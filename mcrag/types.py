@@ -110,6 +110,14 @@ class GoldQuestion:
     `"real"` for one promoted from a logged, human-reviewed real query. Lets
     eval reports split synthetic-set performance from real-traffic performance
     once the latter exists, instead of silently mixing the two.
+
+    `history` holds prior user turns for the `multi_turn` slice only -- the
+    de-contextualization test needs `question` to be an under-specified
+    follow-up ("what about for international students?") that only resolves
+    against `history`. Assistant turns are not scripted here: the pipeline
+    generates its own prior answers live during eval, so scripting them would
+    test the pipeline against canned text it never produced. Empty for every
+    other slice.
     """
 
     qid: str
@@ -121,6 +129,7 @@ class GoldQuestion:
     expected_referral: str | None = None
     split: str | None = None  # filled in by the splitter, absent before that
     provenance: str = "synthetic"
+    history: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
