@@ -490,22 +490,45 @@ an explicit call.
 ## Task 13: Author the gold set (~300 questions)
 
 **Description:** The largest manual effort in the project. Slice quotas
-proportional to PLAN Phase 2, scaled to 300.
+proportional to PLAN Phase 2, scaled to 300. Per decision 0004, this v1 set is
+`provenance: "synthetic"` throughout — drafted from the corpus, not from real
+student queries (none are available). A 28-question pilot batch (single_silo,
+cross_silo, out_of_scope) was drafted first and human-approved on style/rigor
+before the remaining 272 were authored to match it.
+
+**Authoring method:** drafted by LLM subagents (one per slice or slice-group),
+each required to (a) match the approved pilot's tone — natural student
+phrasing, not textbook-stiff — and (b) ground every `gold` ref in a real
+`chunk_id` from `corpus/chunks.jsonl`, quote-checked against the actual chunk
+text, never asserted from memory. Schema-validated programmatically, at scale,
+rather than by hand-reading all 300 (see Checkpoint C for what a human should
+still spot-check).
 
 **Acceptance criteria:**
-- [ ] ~300 questions across all six slices at target proportions
-- [ ] Every answerable question has heading-level gold refs
-- [ ] Cross-silo questions marked `conjunctive: true` and reference ≥2 silos
-- [ ] Out-of-scope slice has no gold refs and is explicitly unanswerable from the corpus
-- [ ] Authored against **train+dev only** — do not read test questions while tuning later
+- [x] ~300 questions across all **seven** slices at target proportions — exactly 300, matching `SLICE_TARGETS` per slice precisely (single_silo 80, cross_silo 70, out_of_scope 60, temporal 25, exact_match 25, adversarial 25, multi_turn 15)
+- [x] Every answerable question has heading/chunk-level gold refs — every `gold` chunk_id verified to exist in `corpus/chunks.jsonl` (`tests/test_gold_v1.py`)
+- [x] Cross-silo questions marked `conjunctive: true` and reference ≥2 silos — verified programmatically for all 70 (`tests/test_gold_v1.py`)
+- [x] Out-of-scope slice has no gold refs and is explicitly unanswerable from the corpus — all 60 have `gold: []`; each was checked against the corpus by grep before being included (a candidate was dropped, not included, if it turned out answerable — several such rejections are on record from the drafting agents)
+- [x] Authored against **train+dev only** — moot for authoring itself (no split existed yet to leak from); the split was assigned by `stratified_split` *after* every question was finalized, so authoring could not have been steered by which split a question landed in. The discipline that matters **going forward** is not reading `data/gold/gold_v1.jsonl`'s test-split rows while tuning anything — `TestAccessCounter` (Task 12) is how that gets enforced and logged
+- [x] `multi_turn` questions carry ≥1 prior turn in `history` (schema gap found and fixed before authoring — see the `history` field commit) — a gap the original Task 12 schema didn't anticipate
 
-**Verification:** Schema validation passes; sample 20 and confirm gold refs actually contain the answer.
+**Verification:** Schema validation passes on all 300 (`tests/test_gold_v1.py`,
+7 tests, run against the committed file itself, not just the tooling). Every
+gold chunk_id exists in the corpus; single_silo/cross_silo silo-spanning
+verified programmatically; every `expected_referral` is a real `offices.yaml`
+email. **Not yet done: a human sampling ~20 questions and independently
+confirming the gold refs actually contain the answer** — the drafting agents
+self-verified this by quote-checking, but per Checkpoint C below this dataset
+is the measuring instrument for everything after, and self-verification by
+the same process that wrote the questions is not independent verification.
 
-**Dependencies:** T12, T11 · **Scope:** L — *split by slice across sessions*
+**Dependencies:** T12, T11 · **Scope:** L — drafted via 5 parallel subagent
+batches instead of split across human sessions, but the a-few-slices-at-a-time
+structure PLAN anticipated is exactly what happened
 
 ### ✅ Checkpoint C
-- [ ] 300 questions validated, split, locked
-- [ ] Gold refs verified on a 20-question sample
+- [x] 300 questions validated, split, locked — `data/gold/gold_v1.jsonl`, `data/gold/split.lock` (seed 42, stratified 40/20/40 within every slice)
+- [ ] Gold refs verified on a 20-question sample — **still needs a human**, see Task 13's verification note above
 - [ ] **Human review — this dataset is the measuring instrument for everything after**
 
 ---

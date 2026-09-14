@@ -24,8 +24,8 @@ Design rationale lives in `PLAN.md`.
 
 ## Phase 2 — Gold set
 - [x] T12 · Gold-set schema + split tooling (M) — `mcrag/eval/gold.py`, `mcrag.types.GoldQuestion`; schema carries an expected referral; refusal correctness splits into refused-correctly and routed-correctly (decision 0002); did not need T8's final `offices.yaml` to build
-- [ ] T13 · Author ~300 questions (L — split by slice, incl. the ~15 multi-turn slice)
-- [ ] **Checkpoint C** — dataset validated, split, locked
+- [x] T13 · Author ~300 questions (L — split by slice, incl. the ~15 multi-turn slice) — 300/300, exact slice-target match, `provenance: "synthetic"` (decision 0004); `data/gold/gold_v1.jsonl` + `data/gold/split.lock` (40/20/40 stratified, seed 42); `tests/test_gold_v1.py` (7 tests) guards the committed file. **Still needs a human 20-question spot-check** (Checkpoint C) before it's fully trusted
+- [ ] **Checkpoint C** — dataset validated, split, locked (validated/split/locked done; human 20-question spot-check still open)
 
 ## Phase 3 — Baselines
 - [ ] T14 · Retrieval eval harness, zero quota (M)
