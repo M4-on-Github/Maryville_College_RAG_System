@@ -538,12 +538,12 @@ structure PLAN anticipated is exactly what happened
 ## Task 14: Retrieval eval harness (zero quota)
 
 **Acceptance criteria:**
-- [ ] Computes recall@k, MRR, nDCG against gold refs
-- [ ] Computes **all-golds-retrieved@k** for `conjunctive` questions — partial recall scores zero
-- [ ] Runs the full gold set in seconds, no LLM calls
-- [ ] Writes a standard run dir (T1)
+- [x] Computes recall@k, MRR, nDCG against gold refs — `mcrag/eval/retrieval_metrics.py`, pure functions over `(gold, retrieved, k)`, no I/O
+- [x] Computes **all-golds-retrieved@k** for `conjunctive` questions — partial recall scores zero — `all_golds_retrieved_at_k`; `summarize()` gives it its own `conjunctive_all_golds_retrieved@k` breakout rather than burying it in the overall average
+- [x] Runs the full gold set in seconds, no LLM calls — `mcrag/eval/retrieval_harness.py`'s `run()`; a question with no gold (`out_of_scope`) is skipped, not scored as a failure — abstention is a generation-level question, not a retrieval-metric one
+- [x] Writes a standard run dir (T1) — `RunDir.create`/`.append`/`.write_metrics`, resumable (re-running a complete run dir rescans `completed_ids()` and touches the retriever again for nothing)
 
-**Verification:** Hand-compute metrics for 3 questions and match the harness output exactly.
+**Verification:** `tests/test_retrieval_metrics.py` (13 tests) — every case hand-worked in a comment above it, including the 3-question end-to-end case T14 itself calls for. `tests/test_retrieval_harness.py` (5 tests) — a fake deterministic retriever, conjunctive breakout math verified by hand (2 conjunctive questions, one full match one partial -> mean 0.5), and a resume test that would silently corrupt if re-scoring happened (second retriever returns nothing for every query, would zero everything if it re-ran). Full suite: 307 passed.
 
 **Dependencies:** T11, T12 · **Scope:** M
 

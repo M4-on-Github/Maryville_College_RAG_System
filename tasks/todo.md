@@ -28,7 +28,7 @@ Design rationale lives in `PLAN.md`.
 - [x] **Checkpoint C** — dataset validated, split, locked, human-reviewed
 
 ## Phase 3 — Baselines
-- [ ] T14 · Retrieval eval harness, zero quota (M)
+- [x] T14 · Retrieval eval harness, zero quota (M) — `mcrag/eval/retrieval_metrics.py` (recall@k, MRR, nDCG, all-golds-retrieved@k) + `mcrag/eval/retrieval_harness.py` (gold set -> RunDir, resumable); out_of_scope questions skipped from retrieval scoring (no gold to score against); `tests/test_retrieval_metrics.py` (13), `tests/test_retrieval_harness.py` (5)
 - [ ] T15 · Phase 3a retrieval baseline (S)
 - [ ] T16 · Phase 3b end-to-end sanity check (M) ⚠️ **risk gate**
 - [ ] T16b · **Pre-registered analysis plan + stats tooling** (M) ← *written before any Phase 4 run, worthless after*
