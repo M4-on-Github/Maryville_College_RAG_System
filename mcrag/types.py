@@ -104,6 +104,12 @@ class GoldQuestion:
     `expected_referral` is decision 0002's field: the office/contact/destination
     a correct answer or refusal should route to, where one applies. Empty for
     slices that don't reach a silo (e.g. most `out_of_scope` questions).
+
+    `provenance` is decision 0004's field: `"synthetic"` for a question drafted
+    from the corpus (v1 of this gold set, in the absence of real user queries),
+    `"real"` for one promoted from a logged, human-reviewed real query. Lets
+    eval reports split synthetic-set performance from real-traffic performance
+    once the latter exists, instead of silently mixing the two.
     """
 
     qid: str
@@ -114,6 +120,7 @@ class GoldQuestion:
     notes: str = ""
     expected_referral: str | None = None
     split: str | None = None  # filled in by the splitter, absent before that
+    provenance: str = "synthetic"
 
 
 @dataclass(frozen=True, slots=True)

@@ -17,6 +17,8 @@ from pathlib import Path
 
 from mcrag.types import GoldQuestion
 
+PROVENANCE_VALUES = ("synthetic", "real")
+
 # PLAN Phase 2 §"Sizing and splits": seven slices, non-proportional growth,
 # summing to ~300. Kept here as the single source of truth for validation and
 # for reporting how a drafted set compares to target.
@@ -57,6 +59,10 @@ def validate(question: GoldQuestion) -> list[str]:
         problems.append(f"{question.slice} questions need at least one gold ref")
     if question.conjunctive and len(question.gold) < 2:
         problems.append("conjunctive=true requires at least 2 gold refs")
+    if question.provenance not in PROVENANCE_VALUES:
+        problems.append(
+            f"unknown provenance {question.provenance!r}; expected one of {PROVENANCE_VALUES}"
+        )
     return problems
 
 
@@ -163,6 +169,7 @@ def load_gold_questions(path: Path) -> list[GoldQuestion]:
                     notes=raw.get("notes", ""),
                     expected_referral=raw.get("expected_referral"),
                     split=raw.get("split"),
+                    provenance=raw.get("provenance", "synthetic"),
                 )
             )
     return questions

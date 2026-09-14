@@ -48,6 +48,20 @@ def test_validate_conjunctive_requires_at_least_two_gold_refs():
     assert validate(_q("q1", gold=("ref-1", "ref-2"), conjunctive=True)) == []
 
 
+def test_validate_defaults_provenance_to_synthetic():
+    assert _q("q1").provenance == "synthetic"
+    assert validate(_q("q1")) == []
+
+
+def test_validate_rejects_unknown_provenance():
+    q = GoldQuestion(
+        qid="q1", slice="single_silo", question="q", gold=("ref-1",),
+        conjunctive=False, provenance="made-up",
+    )
+    problems = validate(q)
+    assert any("provenance" in p for p in problems)
+
+
 def test_stratified_split_is_deterministic_from_the_seed():
     questions = [_q(f"q{i}") for i in range(20)]
     a = stratified_split(questions, seed=42)
@@ -106,12 +120,15 @@ def test_gold_questions_round_trip_through_jsonl(tmp_path):
             gold=(),
             conjunctive=False,
             expected_referral="admissions@maryvillecollege.edu",
+            provenance="real",
         ),
     ]
     path = tmp_path / "gold.jsonl"
     write_gold_questions(path, questions)
     loaded = load_gold_questions(path)
     assert loaded == questions
+    assert loaded[0].provenance == "synthetic"
+    assert loaded[1].provenance == "real"
 
 
 def test_slice_targets_sum_to_roughly_300():
