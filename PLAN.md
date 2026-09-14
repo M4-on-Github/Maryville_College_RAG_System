@@ -1381,3 +1381,16 @@ reranker helped or the college edited a page.
   here is only that **no decision made now forecloses it.**
 - Multi-turn conversation beyond the ~15-question slice.
 - News as a separate, clearly-labelled index (§1).
+- **Program-requirement lists and admissions statistics (acceptance rate,
+  retention/graduation rate, class-size figures beyond the college-wide
+  averages).** These are real, published data — the requirement lists live on
+  the robots-disallowed `smart_catalog_prog` pages (decision 0001), and
+  admissions/outcome statistics likely exist in a source this project hasn't
+  ingested (e.g. the college's Common Data Set, an external document, not part
+  of `maryvillecollege.edu`'s own crawlable pages). Both are correctly
+  `out_of_scope` for v1's corpus, not a mapper or extraction defect — Task 13's
+  gold set deliberately tests that the bot refuses these rather than
+  hallucinating a number. Filling the gap later means adding a new,
+  separately-scoped ingestion source (with its own robots/terms check per
+  decision 0001's discipline for the catalog), not stretching the current
+  crawl scope to cover it.
