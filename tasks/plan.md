@@ -585,14 +585,40 @@ exist to move. `tests/test_fixed_size_chunker.py` (6), `tests/test_chunk_alignme
 **Description:** Validates that retrieval metrics predict answer quality
 *before* twenty ablations are tuned against them.
 
-**Acceptance criteria:**
-- [ ] 25 dev questions run end-to-end on the 3a config
-- [ ] Answers **hand-scored 0/1/2** — no LLM judge at this n
-- [ ] Disagreement quadrants analysed per PLAN Phase 3b
-- [ ] `num_ctx` truncation explicitly ruled out
-- [ ] **Primary retrieval metric chosen empirically** and recorded in `decisions/`
+**What running this for real found.** Two bugs, caught because this was a
+real end-to-end run and not just a retrieval-only score. (1) The generator's
+streaming reader let `requests` guess the response encoding, which defaults to
+Latin-1 for `text/event-stream` with no charset header — every curly quote,
+em-dash and non-breaking space in a real answer came out as mojibake. Fixed in
+`mcrag/generate/ollama_cloud.py` (pin `response.encoding = "utf-8"`); the fix
+is invisible to any test that JSON-escapes its fixture bytes, so the
+regression test builds raw UTF-8 wire bytes directly. (2) One question
+(`ss-39`) scored `ndcg@k = 1.13` — nDCG is normalized and cannot exceed 1.0.
+Cause: `chunk_alignment.canonicalize_retrieved` (T15's content-overlap fix)
+could relabel two *different* retrieved chunks to the *same* gold id when two
+overlapping fixed-size windows both covered one gold paragraph, double-
+counting that hit at two ranks. Fixed so a gold id is claimed only once, at
+its best rank; corrected T15's committed run dir and `RESULTS.md`
+(nDCG 0.598 → 0.587; recall/MRR/all-golds were unaffected).
 
-**Verification:** Written finding stating which metric tracks hand-scored quality, with the quadrant table.
+Also found, orthogonal to both: the naive prompt never delimited retrieved
+passages from the user's question, and the corpus is unreviewed scraped web
+text — an instruction-shaped sentence on some future page is indistinguishable
+from a real instruction in a flat concatenated prompt. Fixed in the new
+`mcrag/generate/prompting.py` (shared by every script that builds a
+generation prompt, so the fix can't silently apply to only one caller):
+`<passages>`/`<question>` tags plus an explicit system-prompt clause. This
+run predates the fix and was not rerun on it (would have invalidated the
+hand-scores already recorded); the fix applies starting with Task 20.
+
+**Acceptance criteria:**
+- [x] 25 dev questions run end-to-end on the 3a config — stratified across all 6 answerable slices (`scripts/run_phase3b_sanity.py`), `runs/20260915T004143Z_2a62552d2271/`
+- [x] Answers **hand-scored 0/1/2** — no LLM judge at this n — `docs/phase3b-sanity-review.md`, human-scored
+- [x] Disagreement quadrants analysed per PLAN Phase 3b — see `decisions/0005-primary-retrieval-metric.md`: 76% diagonal agreement; the 2 high-retrieval/bad-answer cases are generation-stage (output-token exhaustion, inference confidence), not retrieval; the 6 low-retrieval/good-answer cases are grounded-but-mislabeled or defensible grounded refusals — never the dangerous parametric-knowledge case PLAN warns about
+- [x] `num_ctx` truncation explicitly ruled out — zero `truncation_risk` flags across all 25 (guard raises rather than truncates); the one empty-answer case (`ss-39`) is `max_tokens`/reasoning exhaustion, a distinct failure mode, documented as such rather than conflated with the guard
+- [x] **Primary retrieval metric chosen empirically** and recorded in `decisions/` — `all_golds_retrieved@k`, per `decisions/0005-primary-retrieval-metric.md`
+
+**Verification:** Written finding stating which metric tracks hand-scored quality, with the quadrant table — `decisions/0005-primary-retrieval-metric.md`. Checkpoint D call: **GO**.
 
 **Dependencies:** T15, T3 · **Scope:** M
 
@@ -746,14 +772,33 @@ framework imported anywhere in this module.** This is what makes the API a thin
 shell and the UI genuinely optional — it is importable from a script, a test, or
 a notebook.
 
+This is also where the project's persona is decided, and persona and
+prompt-safety are not separable: T16 (`decisions/0005`) hardened
+`mcrag/generate/prompting.py` against *passage*-borne injection (scraped page
+text shaped like an instruction). This task is the first place a live,
+adversarial *user* turn exists in the pipeline — everything before it only
+ever ran pre-authored gold questions — so it is also the first place
+*user*-borne injection ("ignore your instructions and...", "reveal your
+system prompt", role-play jailbreaks) needs a defense. It has never been
+named as a requirement anywhere before now: PLAN's adversarial gold slice
+tests false-premise resistance, not injection resistance, and the risk table
+had no row for it (added, §6). Recorded here rather than at T25/T27 because
+persona and system-prompt content are decided in *this* module and the
+service layer must not need to change to add the defense later.
+
 **Acceptance criteria:**
 - [ ] Runs the frozen Checkpoint-E config end to end
 - [ ] Yields typed events per T23, in contract order
 - [ ] `import fastapi` does not appear in the module or its imports (asserted by test)
 - [ ] Same code path used by the eval harness, so product and experiment cannot drift
 - [ ] Per-stage latency captured and attached to `done`
+- [ ] System prompt/persona explicitly instructs the model to ignore any
+      user-turn attempt to override its instructions, disclose the system
+      prompt, or act outside the RAG/citation contract, and this is covered
+      by dedicated test cases (not folded into the false-premise adversarial
+      gold slice, which tests a different failure mode)
 
-**Verification:** `pytest tests/test_service.py` drives it with no server running. Grep asserts no framework import.
+**Verification:** `pytest tests/test_service.py` drives it with no server running. Grep asserts no framework import. A small fixed set of user-turn injection attempts (system-prompt disclosure request, instruction override, role-play jailbreak) is run through the service and asserted to still answer in persona / refuse rather than comply.
 
 **Dependencies:** T23 · **Scope:** M
 

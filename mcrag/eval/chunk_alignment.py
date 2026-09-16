@@ -68,22 +68,39 @@ def canonicalize_retrieved(
     exact matching, not a replacement for it, so a retriever run against the
     SAME chunking the gold set was authored against behaves identically to
     calling the metric functions directly.
+
+    Each gold id is claimed at most once, by its best (highest) rank. Two
+    overlapping fixed-size windows commonly both cover one gold paragraph --
+    without this, both would relabel to the same gold id and the metric
+    functions (which count each `retrieved` position independently) would
+    score that single passage as found *twice*, at two ranks; `ndcg_at_k`
+    would then sum DCG contributions past what `idcg` normalizes for and
+    report a score above 1.0. A later duplicate is left as its original id
+    (unmatched) rather than reclaimed by a different gold id, since it is the
+    same physical passage the first occurrence already credited, not a
+    second, independent hit on something else.
     """
     gold_id_set = set(gold_ids)
+    claimed: set[str] = set()
     canon: list[str] = []
     for rid in retrieved_ids:
-        if rid in gold_id_set:
+        if rid in gold_id_set and rid not in claimed:
+            claimed.add(rid)
             canon.append(rid)
             continue
-        r_chunk = retrieved_lookup.get(rid)
+        r_chunk = retrieved_lookup.get(rid) if rid not in gold_id_set else None
         matched: str | None = None
         if r_chunk is not None:
-            for gid in gold_id_set:
+            for gid in gold_id_set - claimed:
                 g_chunk = gold_lookup.get(gid)
                 if g_chunk is None or g_chunk.source_url != r_chunk.source_url:
                     continue
                 if chunks_overlap(r_chunk.text, g_chunk.text, threshold):
                     matched = gid
                     break
-        canon.append(matched if matched is not None else rid)
+        if matched is not None:
+            claimed.add(matched)
+            canon.append(matched)
+        else:
+            canon.append(rid)
     return canon

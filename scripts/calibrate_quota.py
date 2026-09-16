@@ -45,6 +45,7 @@ from mcrag.generate.ollama_cloud import (  # noqa: E402
     GenerationError,
     OllamaCloudGenerator,
 )
+from mcrag.generate.prompting import SYSTEM_PROMPT, build_user_prompt  # noqa: E402
 from mcrag.generate.tokens import TokenEstimator  # noqa: E402
 from mcrag.runlog import Lock, RunDir  # noqa: E402
 
@@ -74,11 +75,13 @@ QUESTIONS = [
     "What does the American Sign Language program involve?",
 ]
 
-SYSTEM_PROMPT = (
-    "You answer questions about Maryville College in Maryville, Tennessee using "
-    "only the passages provided. If the passages do not answer the question, say "
-    "so plainly. Cite the source URL of every passage you use."
-)
+@dataclass(frozen=True, slots=True)
+class _DocumentPassage:
+    """Adapts a sampled `Document` to `prompting.Passage`'s shape (`url` -> `source_url`)."""
+
+    title: str
+    source_url: str
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,15 +119,14 @@ def build_prompts(
     prompts = []
     for i, question in enumerate(questions):
         picked = rng.sample(documents, min(k, len(documents)))
-        passages = "\n\n".join(
-            f"[{n + 1}] {d.title} -- {d.url}\n{d.text[:passage_chars]}"
-            for n, d in enumerate(picked)
-        )
+        passages = [
+            _DocumentPassage(title=d.title, source_url=d.url, text=d.text) for d in picked
+        ]
         prompts.append(
             CalibrationPrompt(
                 query_id=f"cal-{i:02d}",
                 question=question,
-                prompt=f"Passages:\n{passages}\n\nQuestion: {question}\nAnswer:",
+                prompt=build_user_prompt(question, passages, passage_chars=passage_chars),
                 context_urls=tuple(d.url for d in picked),
             )
         )

@@ -117,6 +117,55 @@ def test_the_guard_can_be_stood_down_for_the_calibration_probe(endpoint):
     assert len(SCRIPT["requests"]) == 1
 
 
+class _FakeStreamResponse:
+    """A response whose `.encoding` starts unset, like the real Content-Type:
+    text/event-stream header (no charset param) -- `requests`' own guess for
+    that is Latin-1, not UTF-8, which is the mojibake this class exists to
+    reproduce deterministically instead of trusting a live guess to fail."""
+
+    def __init__(self, lines: list[bytes]) -> None:
+        self.status_code = 200
+        self.encoding: str | None = None
+        self._lines = lines
+
+    def iter_lines(self, decode_unicode: bool = False):
+        for raw in self._lines:
+            yield raw.decode(self.encoding or "ISO-8859-1") if decode_unicode else raw
+
+
+class _FakeSession:
+    def __init__(self, response: _FakeStreamResponse) -> None:
+        self._response = response
+
+    def post(self, *args, **kwargs):
+        return self._response
+
+
+def test_multibyte_answer_text_survives_the_stream_intact():
+    """`text/event-stream` carries no charset, and `requests`' own guess for
+    that is Latin-1, not UTF-8 -- silently mojibake-ing every curly quote,
+    en-dash and non-breaking space the model emits. A live server's charset
+    guess can vary by payload, so this pins `.encoding` directly rather than
+    trusting a real request to reproduce the wrong guess reliably."""
+    text = "Maryville College’s café is open. "
+    # ensure_ascii=False, matching a real server: raw UTF-8 multi-byte bytes on
+    # the wire, not \uXXXX escapes -- json.dumps's default escaping would keep
+    # every byte in ASCII and mask the wrong-decode bug entirely.
+    chunk = json.dumps(delta(content=text), ensure_ascii=False).encode("utf-8")
+    done = json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}]}).encode("utf-8")
+    lines = [b"data: " + chunk, b"data: " + done, b"data: [DONE]"]
+    fake_response = _FakeStreamResponse(lines)
+    gen = OllamaCloudGenerator(
+        model="stub-model",
+        base_url="http://fake",
+        api_key="test-key",
+        num_ctx=8192,
+        max_tokens=256,
+        session=_FakeSession(fake_response),
+    )
+    assert gen.complete("hi").text == text
+
+
 # ---- reasoning separation -----------------------------------------------
 
 

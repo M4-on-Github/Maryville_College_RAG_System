@@ -67,6 +67,29 @@ def test_canonicalize_does_not_relabel_across_different_urls():
     assert canon == ["fixed-0"]
 
 
+def test_canonicalize_claims_a_gold_id_only_once():
+    # Two different fixed-size windows both cover the same gold paragraph --
+    # relabeling both would let ndcg_at_k count one passage as two hits at
+    # two ranks and report a score above 1.0 (T16's real run hit this: two
+    # overlapping "Immigration Information" windows both matched one gold
+    # chunk, producing ndcg@k=1.13).
+    gold_chunk = make_chunk("g1", "report an address change within 10 days of moving")
+    retrieved_a = make_chunk(
+        "fixed-1", "Intro. report an address change within 10 days of moving. More."
+    )
+    retrieved_b = make_chunk(
+        "fixed-2", "report an address change within 10 days of moving, per SEVIS rules."
+    )
+    canon = canonicalize_retrieved(
+        ["other", "fixed-1", "fixed-2"],
+        {"fixed-1": retrieved_a, "fixed-2": retrieved_b},
+        ["g1"],
+        {"g1": gold_chunk},
+    )
+    assert canon == ["other", "g1", "fixed-2"]
+    assert canon.count("g1") == 1
+
+
 def test_canonicalize_leaves_a_genuine_miss_unchanged():
     gold_chunk = make_chunk("g1", "financial aid deadlines are in February")
     retrieved_chunk = make_chunk("fixed-0", "completely unrelated content about the dining hall menu")

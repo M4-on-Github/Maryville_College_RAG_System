@@ -394,6 +394,13 @@ class OllamaCloudGenerator(Generator):
             # bad key. Losing it turns every failure into "HTTP 400".
             raise GenerationError(f"HTTP {response.status_code}: {response.text[:500]}")
 
+        # The provider sends UTF-8 (curly quotes, non-breaking spaces, accented
+        # names all appear in real answers) but its `Content-Type` carries no
+        # explicit charset, so `requests` falls back to Latin-1 and every
+        # multi-byte character comes out as mojibake -- silently, since the
+        # bytes still decode to *something*. Pin it before either read path.
+        response.encoding = "utf-8"
+
         if not payload.get("stream"):
             yield response.json()
             return

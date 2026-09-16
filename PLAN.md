@@ -1316,6 +1316,8 @@ reranker helped or the college edited a page.
 | UI decisions leak into the backend, so the front end cannot be swapped later | Phase 5 freezes the stream contract before the code and asserts no web-framework import in the service module. The reference client is explicitly disposable |
 | A named silo turns out to have no office behind it, so refusals route nowhere | Discovery step 3 makes an office match the *promotion criterion* (§2c) — a silo without a contact row folds or is marked ownerless |
 | Self-authored gold set has no ground truth against real student phrasing | No insider data available (§7); write the adversarial/leading slice deliberately harder to partially compensate, and say so plainly in the portfolio writeup as a limitation, not a caveat buried in a footnote |
+| Retrieved passages are unreviewed scraped web text; instruction-shaped page content is indistinguishable from a real instruction in a flat prompt | `<passages>`/`<question>` delimiters + explicit system-prompt clause (`mcrag/generate/prompting.py`, found and fixed during Task 16) |
+| A live user turn (Task 24 onward, the first point real adversarial input exists) attempts to override the system prompt, extract it, or jailbreak the persona | Task 24's persona/system prompt explicitly instructs the model to ignore in-conversation override attempts; dedicated injection test cases, separate from the false-premise adversarial gold slice |
 
 ---
 
