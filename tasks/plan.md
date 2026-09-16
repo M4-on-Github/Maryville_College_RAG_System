@@ -629,23 +629,23 @@ first Phase 4 run**, because its entire purpose is to make Phase 4 confirmatory
 rather than a search for a story. Written after seeing results, it is worthless.
 
 **Acceptance criteria:**
-- [ ] `decisions/analysis-plan.md` names the primary retrieval, generation and abstention metrics — the retrieval one carried over from the T16 finding and **frozen here**
-- [ ] It lists the specific comparisons the test split will be spent on; anything else is labelled exploratory when reported
-- [ ] Paired comparison utilities: **exact McNemar** for binary outcomes, **seeded paired bootstrap** (10k) for graded ones and for median cost
-- [ ] Every metric function returns `(point_estimate, ci_low, ci_high, n)` — **a bare float is not an acceptable return type anywhere in the harness**
-- [ ] `scripts/mde.py` reproduces the §4f detectable-effect table
-- [ ] Reporting layer refuses to emit a p-value for any dev-split comparison
+- [x] `decisions/analysis-plan.md` names the primary retrieval, generation and abstention metrics — the retrieval one carried over from the T16 finding and **frozen here** — `decisions/0006-analysis-plan.md`: retrieval `all_golds_retrieved@k` (carried over), generation Tier-1 NLI faithfulness (primary) + Tier-0 binary checks (secondary), abstention coverage @ ≥95% precision floor
+- [x] It lists the specific comparisons the test split will be spent on; anything else is labelled exploratory when reported — 10-arm table in `decisions/0006`, matching `docs/quota-calibration.md`'s own sizing
+- [x] Paired comparison utilities: **exact McNemar** for binary outcomes, **seeded paired bootstrap** (10k) for graded ones and for median cost — `mcrag/eval/significance.py`
+- [x] Every metric function returns `(point_estimate, ci_low, ci_high, n)` — **a bare float is not an acceptable return type anywhere in the harness** — every `significance.py` function returns `ComparisonResult` wrapping `stats.Interval`
+- [x] `scripts/mde.py` reproduces the §4f detectable-effect table — hardened: no more undeclared `numpy`/`scipy` dependency, now calls `mcrag.eval.significance.mcnemar_p_value` directly so the power tool can't drift from the real test; added the previously-missing out-of-scope (n=24) split to its own table
+- [x] Reporting layer refuses to emit a p-value for any dev-split comparison — `assert_reportable` raises `DevSplitSignificanceError`
 
 **Verification:** Round-trip a known-effect synthetic pair through both tests and
 confirm the CI covers the truth at the nominal rate. Assert the reporting layer
-raises on a dev p-value request.
+raises on a dev p-value request. — `tests/test_significance.py` (19 tests): a constant known effect is recovered exactly by the bootstrap; a coverage calibration test confirms the 95% CI covers a true 0.2 effect at ~85-100% over 100 replications; a companion test confirms the exact McNemar p-value rejects a true null at roughly the nominal alpha rate; `assert_reportable` is asserted to raise on dev and pass through on test.
 
 **Dependencies:** T16 · **Scope:** M
 
 ### 🚨 Checkpoint D — GO / NO-GO
-- [ ] Retrieval proxy demonstrably tracks answer quality
-- [ ] If it does not: **stop and fix the metric or the gold labels before Phase 4**
-- [ ] **Human review — this gate protects all downstream work**
+- [x] Retrieval proxy demonstrably tracks answer quality — `decisions/0005-primary-retrieval-metric.md`, 76% quadrant agreement, no dangerous disagreement cases
+- [x] If it does not: ~~stop and fix the metric or the gold labels before Phase 4~~ — not triggered, GO
+- [x] **Human review — this gate protects all downstream work** — signed off 2026-09-16
 
 ---
 
