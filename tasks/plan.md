@@ -654,14 +654,46 @@ raises on a dev p-value request. — `tests/test_significance.py` (19 tests): a 
 ## Task 17: Ablation runner (resumable, cached)
 
 **Acceptance criteria:**
-- [ ] Takes a config matrix, runs one variable at a time, one run dir each
-- [ ] Generation cache keyed `(model, digest, prompt_hash)`; identical reruns cost zero quota
-- [ ] Resume from last completed `qid` after interruption
-- [ ] Quota wall → clean pause with resumable state, never a corrupt run
+- [x] Takes a config matrix, runs one variable at a time, one run dir each
+- [x] Generation cache keyed `(model, digest, prompt_hash)`; identical reruns cost zero quota
+- [x] Resume from last completed `qid` after interruption
+- [x] Quota wall → clean pause with resumable state, never a corrupt run
 
 **Verification:** Kill mid-sweep, resume, confirm no duplicate generations and identical final metrics.
 
 **Dependencies:** T1, T14 · **Scope:** M
+
+**What building this found:** `mcrag/eval/ablation_runner.py` is deliberately
+generic — it knows nothing about retrieval or generation, only how to turn a
+`Config` into a resumable `RunDir` and drive a caller-supplied
+`evaluate_fn`/`summarize_fn` over a gold-question list. That's the same
+seam shape T14's `retrieval_harness.evaluate_question` already established;
+T18 onward supply the pipeline-specific logic, T17 supplies only the
+orchestration.
+
+Two things needed building that weren't implied by T1/T14 alone:
+- `find_or_create_run_dir(config, root)` — `RunDir.create` names directories
+  `<timestamp>_<config_hash>`, so calling it twice for the same config (e.g.
+  re-invoking a sweep after a kill) makes a *second*, empty directory next to
+  the half-finished one instead of resuming it. Resume needed to look a run
+  dir up by its config-hash suffix, not by timestamp.
+- `GenerationCache`, keyed `(model, digest, prompt_hash)` and shared across
+  every arm in a sweep (not scoped to one run dir) — two arms that send the
+  identical prompt (same retrieved passages, same question, same decoding
+  config) now pay for the generation once. Backed by an append-only JSONL
+  file with the same fsync-per-record discipline as `RunDir.append`.
+
+`SweepPaused` is the quota-wall contract: `run_arm`/`run_matrix` take a
+`quota_errors` tuple of exception types that mean "the metered backend
+stopped serving us" (as opposed to a bug in `evaluate_fn`, which propagates
+immediately, uncaught) and turn one into a clean stop with the run dir intact
+— every record that reached `evaluate_fn` was already appended and fsynced
+before the exception could unwind. `run_matrix` stops at the first paused
+arm; arms before it are complete, arms after it never started; a second call
+with the same config list resumes exactly there. `tests/test_ablation_runner.py`
+(13 tests) includes the literal verification step: two independent sweeps of
+the same matrix, one clean and one deliberately paused-then-resumed, produce
+identical final `metrics.json` — not merely "no crash," but no divergence.
 
 ## Task 18: Free retrieval ablations — **factorial, not OFAT** (#1–#5, #7)
 

@@ -35,7 +35,7 @@ Design rationale lives in `PLAN.md`.
 - [x] 🚨 **Checkpoint D — GO/NO-GO** — does the retrieval proxy track answer quality? **GO**, human-signed-off 2026-09-16 (`decisions/0005`). T16b (analysis-plan lock) still required before the first Phase 4 run
 
 ## Phase 4 — Ablations
-- [ ] T17 · Ablation runner, resumable + cached (M)
+- [x] T17 · Ablation runner, resumable + cached (M) — `mcrag/eval/ablation_runner.py`: `find_or_create_run_dir` (resume by config-hash suffix, not timestamp), `GenerationCache` keyed `(model, digest, prompt_hash)` shared across a whole sweep, `run_arm`/`run_matrix` + `SweepPaused` for a clean quota-wall stop. Deliberately generic — no retrieval/generation logic, just the orchestration T18+ plug `evaluate_fn` into. `tests/test_ablation_runner.py` (13) proves clean-vs-resumed-sweep metrics are identical
 - [ ] T18 · Free retrieval ablations — **factorial, 32 cells, not OFAT** (L)
 - [ ] T19 · Generation scoring ladder (M)
 - [ ] T20 · Phase 3c generation baseline (S)
