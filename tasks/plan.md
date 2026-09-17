@@ -761,14 +761,40 @@ anywhere in this comparison, per `decisions/0006`).
 ## Task 19: Generation scoring ladder
 
 **Acceptance criteria:**
-- [ ] Tier 0 deterministic metrics implemented (citation accuracy/validity, refusal correctness, exact-match regex)
-- [ ] Tier 1 NLI faithfulness via local DeBERTa-class entailment model
-- [ ] If a Tier 3 judge is used: different model, **temperature 0**, calibrated against the Task 16 hand-scores, **κ reported**
-- [ ] Uncalibrated judge output is never reported as a metric
+- [x] Tier 0 deterministic metrics implemented (citation accuracy/validity, refusal correctness, exact-match regex)
+- [x] Tier 1 NLI faithfulness via local DeBERTa-class entailment model
+- [x] If a Tier 3 judge is used: different model, **temperature 0**, calibrated against the Task 16 hand-scores, **κ reported**
+- [x] Uncalibrated judge output is never reported as a metric
 
 **Verification:** Tier 0 metrics hand-verified on 5 answers; judge κ recorded if used.
 
 **Dependencies:** T16 · **Scope:** M
+
+**What building this found:** `mcrag/eval/tier0_scoring.py` (citation
+accuracy/validity, refusal correctness, exact-match presence) works against
+Task 16's real answers *as they already are* — the naive prompt never forced
+a citation syntax (that's ablation #8, Task 22), so citation extraction is a
+bare-URL regex rather than a structured format, and it still discriminates:
+hand-verified against 5 real T16 answers (`adversarial-10`, `-12`, `-01`,
+`cs-14`, `cs-25` in `docs/phase3b-sanity-review.md`), all five score exactly
+as a human reading them would expect. `mcrag/eval/nli_faithfulness.py`
+(Tier 1) is the same tool class as T18's `CrossEncoderReranker` — a local
+`sentence_transformers.CrossEncoder`, lazy-loaded, zero quota and offline
+once cached — pointed at an NLI label space instead of relevance.
+
+Tier 3 is built but **not run against real answers by this task**: PLAN's
+own reservation (`decisions/0006`) is that Tier 2/3 scoring is spent at
+Task 20's control run and the final test-split confirmation, not per
+ablation, so the actual calibration against Task 16's 25 hand-scores is
+T20's job. What's built now is the mechanism that makes an uncalibrated
+judge impossible to accidentally report: `mcrag/eval/judge_calibration.py`
+(`cohens_kappa`, `assert_calibrated` — the same enforcement pattern as
+T16b's `assert_reportable` dev-split guard, checked at report time rather
+than trusted at every call site) and `mcrag/eval/tier3_judge.py`
+(`Tier3JudgeScorer`, which refuses to construct if the judge model equals
+the judged model or temperature isn't exactly 0, and refuses to `judge()`
+without a calibration clearing the κ≥0.6 floor). 49 new tests across the
+four modules, all against fakes — no quota spent building this task.
 
 ## Task 20: Phase 3c generation baseline
 
