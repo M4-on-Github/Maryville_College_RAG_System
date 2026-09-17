@@ -16,6 +16,13 @@ dependencies = [
 
 [project.optional-dependencies]
 index = ["lancedb>=0.6", "sentence-transformers>=2.7", "rank-bm25>=0.2.2"]
+# sentencepiece: DeBERTa-v2/v3 tokenizers (Task 19 NLI faithfulness, Task 18
+# cross-encoder reranker) require it; not pulled in by sentence-transformers
+# itself. brotli: huggingface_hub's httpx-based downloader silently corrupts
+# a brotli-compressed model file without it (brotlicffi alone reproduces a
+# "Cannot find the requested files" / "Unrecognized processing class" error
+# that looks like a real model incompatibility but isn't -- Task 19 hit this).
+scoring = ["sentencepiece>=0.2", "brotli>=1.1"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]

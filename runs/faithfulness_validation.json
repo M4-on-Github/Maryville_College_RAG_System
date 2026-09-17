@@ -1,0 +1,59 @@
+{
+  "criterion": "Does Tier 1 faithfulness track human judgment? Checked against Task 16's\n25 hand-scored answers (0 = wrong/ungrounded, 1 = partial, 2 = correct and\ngrounded), offline, no quota.\n\nPass criterion, fixed before the numbers were computed (Task 20): Tier 1 is\nfit to remain the primary generation metric only if\n  (a) mean faithfulness rises monotonically across hand scores 0 -> 1 -> 2, and\n  (b) the Spearman rank correlation's 95% bootstrap CI excludes zero.",
+  "results": [
+    {
+      "scorer": "v1 (commit bf29473, joined premise)",
+      "n_scored": 20,
+      "distinct_values": 1,
+      "mean_by_hand_score": {
+        "0": {
+          "mean": null,
+          "n": 0
+        },
+        "1": {
+          "mean": 0.0,
+          "n": 2
+        },
+        "2": {
+          "mean": 0.0,
+          "n": 18
+        }
+      },
+      "monotone": false,
+      "spearman": {
+        "value": NaN,
+        "ci_low": NaN,
+        "ci_high": NaN,
+        "n": 20
+      },
+      "passes": false
+    },
+    {
+      "scorer": "3-windowed-max-normalized",
+      "n_scored": 20,
+      "distinct_values": 7,
+      "mean_by_hand_score": {
+        "0": {
+          "mean": null,
+          "n": 0
+        },
+        "1": {
+          "mean": 0.16666666666666666,
+          "n": 2
+        },
+        "2": {
+          "mean": 0.3904761904761905,
+          "n": 18
+        }
+      },
+      "monotone": false,
+      "spearman": {
+        "value": 0.16557554746311093,
+        "ci_low": -0.15792866716093298,
+        "ci_high": 0.45732956038002354,
+        "n": 20
+      },
+      "passes": false
+    }
+  ]
+}

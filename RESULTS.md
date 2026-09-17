@@ -38,6 +38,8 @@ Regenerated from `runs/` by `scripts/generate_results.py` -- never hand-edited.
 | 20260916T221804Z_938009e32755 | bp_on-paragraph-fusion_on-rerank_off-silo_on | dev | 0.656 [0.531, 0.771] (n=48) | 0.585 [0.459, 0.707] (n=48) | 0.581 [0.461, 0.696] (n=48) | 0.583 [0.438, 0.729] (n=48) |
 | 20260916T221817Z_0bccdadf7b83 | bp_on-paragraph-fusion_on-rerank_on-silo_off | dev | 0.760 [0.656, 0.854] (n=48) | 0.706 [0.592, 0.815] (n=48) | 0.693 [0.584, 0.797] (n=48) | 0.667 [0.521, 0.792] (n=48) |
 | 20260916T221832Z_624eb6feedbf | bp_on-paragraph-fusion_on-rerank_on-silo_on | dev | 0.760 [0.656, 0.854] (n=48) | 0.706 [0.592, 0.815] (n=48) | 0.693 [0.584, 0.797] (n=48) | 0.667 [0.521, 0.792] (n=48) |
+| 20260917T032746Z_77e78976ead3 | phase3c-baseline | dev | 0.771 [0.656, 0.875] (n=48) | 0.624 [0.510, 0.733] (n=48) | 0.646 [0.536, 0.748] (n=48) | 0.708 [0.583, 0.833] (n=48) |
+| 20260917T044122Z_c1d4b7284f0f | phase3c-baseline | dev | 0.771 [0.656, 0.875] (n=48) | 0.624 [0.510, 0.733] (n=48) | 0.646 [0.536, 0.748] (n=48) | 0.708 [0.583, 0.833] (n=48) |
 
 ## Task 18: free retrieval factorial -- main effects and interactions
 

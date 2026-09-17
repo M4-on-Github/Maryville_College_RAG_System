@@ -1,0 +1,33 @@
+arm: phase3c-baseline-repro-check
+chunk:
+  embedder_token_limit: 512
+  max_tokens: 512
+  overlap_ratio: 0.15
+crawl: null
+eval:
+  gold_path: data\gold\gold_v1.jsonl
+  scorers: []
+  split: dev
+  tau: null
+generation:
+  base_url: https://ollama.com/v1
+  generator: null
+  max_tokens: 1024
+  model: gpt-oss:20b-cloud
+  num_ctx: 8192
+  temperature: 0.0
+name: phase3c-generation-baseline
+notes: 'Task 20 Phase 3c control: naive prompt, no forced citations, no abstention
+  threshold, frozen retrieval config (decisions/0007), full dev split, scored with
+  the Task 19 ladder (Tier 0 + Tier 1). Retrieved passages sent whole (no per-passage
+  character cut). Multi-turn: prior user turns answered live and passed to the prompt
+  as chat history; retrieval sees only the current turn (decisions/0008).'
+retrieval:
+  candidate_k: 20
+  fuser: null
+  k: 5
+  legs: []
+  reformulator: null
+  reranker: null
+  silo_boost: 0.0
+seed: 42

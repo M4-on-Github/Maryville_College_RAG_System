@@ -1,0 +1,7 @@
+{
+  "detail": {
+    "generator": "gpt-oss:20b-cloud"
+  },
+  "digest": "BAAI/bge-base-en-v1.5+gpt-oss:20b-cloud",
+  "kind": "model"
+}

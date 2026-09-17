@@ -1,0 +1,215 @@
+{
+  "all_golds_retrieved@k": {
+    "ci_high": 0.8333333333333334,
+    "ci_low": 0.5833333333333334,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.7083333333333334
+  },
+  "by_slice": {
+    "adversarial": {
+      "faithfulness": {
+        "ci_high": 0.8333333333333333,
+        "ci_low": 0.125,
+        "n": 4,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.47916666666666663
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 0.4,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.8
+      }
+    },
+    "cross_silo": {
+      "faithfulness": {
+        "ci_high": 0.3964285714285714,
+        "ci_low": 0.15277777777777776,
+        "n": 12,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.2746031746031746
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 0.7857142857142857,
+        "n": 14,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.9285714285714286
+      }
+    },
+    "exact_match": {
+      "faithfulness": {
+        "ci_high": 1.0,
+        "ci_low": 0.3,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.7
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      }
+    },
+    "multi_turn": {
+      "faithfulness": {
+        "ci_high": 0.0,
+        "ci_low": 0.0,
+        "n": 2,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.0
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 0.0,
+        "n": 3,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.6666666666666666
+      }
+    },
+    "out_of_scope": {
+      "faithfulness": {
+        "ci_high": 0.6388888888888888,
+        "ci_low": 0.05555555555555555,
+        "n": 6,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.3055555555555556
+      },
+      "refusal_correct": {
+        "ci_high": 0.75,
+        "ci_low": 0.25,
+        "n": 12,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.5
+      }
+    },
+    "single_silo": {
+      "faithfulness": {
+        "ci_high": 0.7291666666666666,
+        "ci_low": 0.3645833333333333,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.54375
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 16,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      }
+    },
+    "temporal": {
+      "faithfulness": {
+        "ci_high": 0.9,
+        "ci_low": 0.1,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 0.5
+      },
+      "refusal_correct": {
+        "ci_high": 1.0,
+        "ci_low": 1.0,
+        "n": 5,
+        "seed": 42,
+        "statistic": "mean",
+        "value": 1.0
+      }
+    }
+  },
+  "citation_accuracy": {
+    "ci_high": 0.875,
+    "ci_low": 0.5625,
+    "n": 24,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.7291666666666666
+  },
+  "citation_validity": {
+    "ci_high": 1.0,
+    "ci_low": 0.875,
+    "n": 24,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.9583333333333334
+  },
+  "exact_match_presence": {
+    "ci_high": 1.0,
+    "ci_low": 0.2,
+    "n": 5,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6
+  },
+  "faithfulness": {
+    "ci_high": 0.5401428571428571,
+    "ci_low": 0.3291428571428571,
+    "n": 50,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.4349047619047619
+  },
+  "mrr": {
+    "ci_high": 0.7333333333333333,
+    "ci_low": 0.5104166666666666,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6239583333333333
+  },
+  "ndcg@k": {
+    "ci_high": 0.7480961874741703,
+    "ci_low": 0.5364229664789651,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6461894494455769
+  },
+  "recall@k": {
+    "ci_high": 0.875,
+    "ci_low": 0.65625,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.7708333333333334
+  },
+  "refusal_correct": {
+    "ci_high": 0.9333333333333333,
+    "ci_low": 0.75,
+    "n": 60,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.85
+  },
+  "refusal_rate": {
+    "ci_high": 0.25,
+    "ci_low": 0.06666666666666667,
+    "n": 60,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.15
+  },
+  "run": {
+    "n_total": "60",
+    "tier1_scorer_versions": "3-windowed-max-normalized",
+    "tier1_truncated_pairs": "0"
+  }
+}

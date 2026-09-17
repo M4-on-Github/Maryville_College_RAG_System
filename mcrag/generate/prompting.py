@@ -50,11 +50,21 @@ class Passage(Protocol):
 
 
 def build_user_prompt(
-    question: str, passages: list[Passage], *, passage_chars: int = DEFAULT_PASSAGE_CHARS
+    question: str, passages: list[Passage], *, passage_chars: int | None = DEFAULT_PASSAGE_CHARS
 ) -> str:
-    """The `<passages>`/`<question>`-delimited prompt body (system prompt is separate)."""
+    """The `<passages>`/`<question>`-delimited prompt body (system prompt is separate).
+
+    `passage_chars=None` sends every retrieved passage whole. The default cut
+    exists for callers passing whole scraped documents; for retrieved chunks
+    it silently hides text the retrieval metrics already credited -- at the
+    frozen 512-token chunk size, 37% of retrieved text and 9% of retrieved
+    gold passages (Task 20, `decisions/0008`). Overflow is the context
+    guard's job (`OllamaCloudGenerator.check_prompt`), which refuses loudly
+    instead of trimming.
+    """
     body = "\n\n".join(
-        f"[{i + 1}] {p.title} -- {p.source_url}\n{p.text[:passage_chars]}"
+        f"[{i + 1}] {p.title} -- {p.source_url}\n"
+        f"{p.text if passage_chars is None else p.text[:passage_chars]}"
         for i, p in enumerate(passages)
     )
     return (

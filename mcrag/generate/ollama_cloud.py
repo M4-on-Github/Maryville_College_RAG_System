@@ -234,9 +234,19 @@ class OllamaCloudGenerator(Generator):
         being mistaken for the answer.
         """
         system = kwargs.pop("system", None)
-        messages = ([{"role": "system", "content": system}] if system else []) + [
-            {"role": "user", "content": prompt}
-        ]
+        # Prior turns as chat messages, oldest first, between the system prompt
+        # and this turn. Counted by the context guard like everything else: a
+        # long conversation must overflow loudly, not push the retrieved
+        # passages off the front of the window.
+        history = kwargs.pop("history", None) or []
+        for turn in history:
+            if turn.get("role") not in ("user", "assistant") or not isinstance(turn.get("content"), str):
+                raise ValueError(f"history turns must be {{role: user|assistant, content: str}}, got {turn!r}")
+        messages = (
+            ([{"role": "system", "content": system}] if system else [])
+            + [{"role": t["role"], "content": t["content"]} for t in history]
+            + [{"role": "user", "content": prompt}]
+        )
         self.check_prompt("\n".join(m["content"] for m in messages))
 
         payload: dict[str, Any] = {

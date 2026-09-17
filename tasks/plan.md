@@ -762,7 +762,7 @@ anywhere in this comparison, per `decisions/0006`).
 
 **Acceptance criteria:**
 - [x] Tier 0 deterministic metrics implemented (citation accuracy/validity, refusal correctness, exact-match regex)
-- [x] Tier 1 NLI faithfulness via local DeBERTa-class entailment model
+- [x] Tier 1 NLI faithfulness via local DeBERTa-class entailment model — ⚠️ **correction, found in Task 20:** the version shipped here joined all retrieved chunks into one premise that the 512-token tokenizer silently truncated, and scored every validation answer exactly 0.000. Rewritten (windowed premises, normalized text, attribution stripping), but the rewrite **fails** its pre-set validation against the Task 16 hand scores. See `decisions/0008`.
 - [x] If a Tier 3 judge is used: different model, **temperature 0**, calibrated against the Task 16 hand-scores, **κ reported**
 - [x] Uncalibrated judge output is never reported as a metric
 
@@ -799,13 +799,73 @@ four modules, all against fakes — no quota spent building this task.
 ## Task 20: Phase 3c generation baseline
 
 **Acceptance criteria:**
-- [ ] Naive prompt (no forced citations, no abstention) on frozen retrieval, dev split
-- [ ] Scored with the Task 19 ladder
-- [ ] Committed as the control for #6, #8, #9, #10
+- [x] Naive prompt (no forced citations, no abstention) on frozen retrieval, dev split
+- [x] Scored with the Task 19 ladder — after fixing Task 19's Tier 1 scorer, which running this exposed as broken
+- [x] Committed as the control for #6, #8, #9, #10 — `runs/20260917T044122Z_c1d4b7284f0f` (with its null-arm rerun)
 
-**Verification:** Reproducible across two runs at temperature 0.
+**Verification (amended 2026-09-17, human decision, `decisions/0008`):** ~~Reproducible across two runs at
+temperature 0.~~ Text-level reproducibility is not achievable on this endpoint (first attempt: 3/60 answers
+identical, 5/60 refuse/answer decisions flipped). **Now:** two runs of the control agree at the metric level,
+meaning every run2−run1 interval covers zero, and that null-arm interval is recorded as the noise floor T22
+must report beside every effect. — ✅ **passes, at the boundary** on the re-run: refusal_correct
+run2−run1 −0.067 [−0.150, 0.000], faithfulness +0.037 [−0.054, +0.127]. Refusal_correct's
+upper end is exactly zero (6 flips, 5 against the rerun, 4 of them cross-silo).
 
 **Dependencies:** T18, T19 · **Scope:** S
+
+**What running this for real found** (full detail, every number, and what was
+rejected: `decisions/0008-generation-baseline-and-tier1-validity.md`):
+
+1. *Task 19's Tier 1 scorer carried zero information.* It joined all retrieved
+   chunks into one premise (1,500–2,500 tokens) that the 512-token NLI tokenizer
+   silently truncated; against Task 16's hand scores it gave every answer 0.000.
+   The first baseline number, 0.013, measured the truncation. Rewritten in three
+   steps, each re-scored offline from stored answers (zero quota, every prior
+   value kept per record): windowed premises (0.243), refusals excluded from the
+   average, since PLAN scores them separately (0.291), then Unicode normalization
+   plus attribution-wrapper stripping (0.400). The wrapper fix wasn't cosmetic:
+   ablation #8 (citation-forced) attributes by design, so it would have looked
+   less grounded for doing so.
+2. *The rewrite fails its own validation.* The criterion was fixed before the
+   numbers were computed: monotone across hand scores 0→1→2, and Spearman CI
+   excluding zero. Result: Spearman 0.166 [−0.158, 0.457], no scorable hand-0
+   answers. The set (20 twos / 3 ones / 2 zeros) is underpowered, but a fail is
+   reported as a fail. Absolute values are biased low (human-judged fully
+   grounded answers average 0.390).
+3. *Temperature 0 is not deterministic on this endpoint.* The second run is a
+   free null arm, giving the project's first measured noise floor: a pure rerun
+   moves faithfulness by up to ~±9 points and refusal-correctness by ~±7 on dev.
+   Task 17's cache masks this, so reproducibility must never be checked through it.
+4. *Multi-turn questions never got their history* — slice numbers invalid (n=3).
+5. *`refusal_correct` is coarse on the adversarial slice* — reported per slice.
+
+Real control-condition findings that do stand: retrieval reproduces T18's frozen
+cell exactly (0.708); the no-abstention baseline answers 5 of 12 out-of-scope
+questions it should refuse (refusal_correct 0.583 on that slice) — the gap #9
+targets; citation accuracy 0.600 when the model cites at all.
+
+6. *The prompt hid a third of what retrieval found.* `build_user_prompt` cut
+   passages to 1,400 chars. At the frozen chunk size that hid 37% of retrieved
+   text and 9% of retrieved gold passages from the model. The control now
+   sends passages whole.
+
+**Decisions, resolved 2026-09-17 by the human reviewer** (`decisions/0008`
+Resolution; `decisions/0006` addendum): (1) verification amended to
+metric-level reproducibility, with the noise floor mandatory in T22;
+(2) Tier 1 faithfulness stays primary, reported only as paired arm
+differences and labelled unvalidated (the extra hand-scoring round was
+declined, so Tier 3 still has no κ calibration set); (3) multi-turn history
+goes to the prompt, not retrieval. Decision 3 and finding 6 changed the
+control's behavior, so it was re-run under a new config hash. The first pair
+of runs is kept, marked superseded.
+
+**The control of record** (dev, `runs/20260917T044122Z_c1d4b7284f0f`):
+refusal_correct 0.850 (out_of_scope only: 0.500, answering 6/12 it should
+refuse — the #9 gap), citation accuracy 0.729 when citing, faithfulness 0.435
+(unvalidated, paired differences only), retrieval 0.708. The null arm
+puts refusal_correct's rerun interval at 15 points wide and faithfulness's at
+18. Most single-arm T22 effects on dev are expected to fall inside that,
+recorded now, before any arm result exists.
 
 ## Task 21: τ calibration study
 
@@ -829,6 +889,10 @@ four modules, all against fakes — no quota spent building this task.
 - [ ] OFAT here is a **quota decision, recorded as such** in `decisions/`, not a design preference
 - [ ] Quality **and** cost logged per run; results presented as a Pareto frontier
 - [ ] Quota consumption tracked against the Task 3 budget
+- [ ] **Every comparison reports the measured noise floor beside its effect** (`decisions/0006` addendum). Temperature 0 isn't deterministic here (`decisions/0008`), so a difference inside the control's rerun interval is reported as indistinguishable from noise, whatever its point estimate
+- [ ] **Tier 1 faithfulness reported only as a paired arm difference, labelled unvalidated**, computed over answered questions with `refusal_rate` beside it. Never quoted as an absolute grounding rate
+- [ ] Noise and reproducibility checks **never go through Task 17's generation cache**, which makes reruns identical by construction and would hide exactly the variance being measured
+- [ ] Reformulation step 5 (de-contextualization) is compared against the Task 20 control, which already passes history to the prompt but not to retrieval. The arm changes only whether retrieval sees a rewritten query
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
@@ -890,6 +954,7 @@ service layer must not need to change to add the defense later.
 
 **Acceptance criteria:**
 - [ ] Runs the frozen Checkpoint-E config end to end
+- [ ] Retrieved passages reach the prompt whole: `build_user_prompt`'s 1,400-char default cut hid 37% of retrieved text and 9% of retrieved gold passages at the frozen chunk size (`decisions/0008`). Pass `passage_chars=None` and let the context guard refuse real overflow
 - [ ] Yields typed events per T23, in contract order
 - [ ] `import fastapi` does not appear in the module or its imports (asserted by test)
 - [ ] Same code path used by the eval harness, so product and experiment cannot drift

@@ -62,3 +62,9 @@ def test_passage_text_is_truncated_to_the_configured_length():
     prompt = build_user_prompt("q", [chunk("z" * 5000)], passage_chars=100)
     passages_span = prompt.split("<passages>")[1].split("</passages>")[0]
     assert passages_span.count("z") == 100
+
+
+def test_passage_chars_none_sends_every_passage_whole():
+    prompt = build_user_prompt("q", [chunk("z" * 5000)], passage_chars=None)
+    passages_span = prompt.split("<passages>")[1].split("</passages>")[0]
+    assert passages_span.count("z") == 5000

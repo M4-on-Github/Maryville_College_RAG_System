@@ -115,3 +115,33 @@ re-litigated per ablation.
 - Any Phase 4 finding not in the comparison table above is reported as
   exploratory, with an effect size and CI but no significance claim,
   regardless of which split it happens to be computed on.
+
+## Addendum — 2026-09-17, after Task 20 (`decisions/0008`)
+
+Added, not edited in: the text above stands as originally locked. This
+addendum was written after the Task 20 *baseline* was scored, but before
+any Phase 4 generation *comparison* had been run, so no arm-vs-arm result
+existed to steer it. That timing is what makes it legitimate; the same
+change made after a T22 result would not be.
+
+1. **Tier 1 faithfulness stays the primary generation metric** (human
+   decision), with its evidence stated rather than assumed. The implementation
+   pre-registered here silently truncated its context and scored every
+   validation answer 0.000. The corrected scorer fails its own pre-set
+   validation against the Task 16 hand scores (Spearman 0.166 [−0.158,
+   0.457], on an underpowered 20-answer set), and its absolute values run
+   low. Therefore:
+   - it is interpreted **only as a paired difference between arms**, never as
+     an absolute grounding rate ("40% of claims are grounded" is not a claim
+     this metric supports);
+   - every report of it carries the statement that it is **not validated
+     against human judgment**;
+   - it is computed over **answered questions only**, with `refusal_rate`
+     reported beside it, since refusals are scored separately (R) and would
+     otherwise count as unfaithful answers.
+2. **Every generation comparison reports the measured noise floor beside its
+   effect.** Temperature 0 is not deterministic on this endpoint: two identical
+   Task 20 runs flipped the refuse/answer decision on 5 of 60 questions. An arm
+   difference inside the null-arm interval (control vs. a rerun of itself) is
+   reported as indistinguishable from rerun noise, whatever its point estimate.
+3. Unchanged: the test split is still spent once, and still only on the table above.

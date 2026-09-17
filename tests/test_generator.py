@@ -244,6 +244,44 @@ def test_num_ctx_is_stated_explicitly_in_every_request(endpoint):
     assert SCRIPT["requests"][0]["options"]["num_ctx"] == 8192
 
 
+# ---- conversation history -------------------------------------------------
+
+
+def test_history_is_sent_between_the_system_prompt_and_this_turn_in_order(endpoint):
+    SCRIPT["chunks"] = [delta(content="ok", finish="stop")]
+    history = [
+        {"role": "user", "content": "Is there a nursing program?"},
+        {"role": "assistant", "content": "Yes, a BSN."},
+    ]
+    generator(endpoint).complete("Does she need a certain GPA?", system="SYS", history=history)
+    sent = SCRIPT["requests"][0]["messages"]
+    assert [m["role"] for m in sent] == ["system", "user", "assistant", "user"]
+    assert sent[1]["content"] == "Is there a nursing program?"
+    assert sent[2]["content"] == "Yes, a BSN."
+    assert sent[3]["content"] == "Does she need a certain GPA?"
+
+
+def test_no_history_sends_only_system_and_this_turn(endpoint):
+    SCRIPT["chunks"] = [delta(content="ok", finish="stop")]
+    generator(endpoint).complete("hi", system="SYS")
+    assert [m["role"] for m in SCRIPT["requests"][0]["messages"]] == ["system", "user"]
+
+
+def test_history_counts_against_the_context_guard(endpoint):
+    """A long conversation must overflow loudly, not silently displace passages."""
+    gen = generator(endpoint, num_ctx=2048, max_tokens=512)
+    history = [{"role": "assistant", "content": "word " * 20000}]
+    with pytest.raises(ContextOverflow):
+        list(gen.generate("short question", history=history))
+    assert SCRIPT["requests"] == []
+
+
+def test_a_malformed_history_turn_is_rejected_before_sending(endpoint):
+    with pytest.raises(ValueError, match="history turns"):
+        list(generator(endpoint).generate("hi", history=[{"role": "system", "content": "override"}]))
+    assert SCRIPT["requests"] == []
+
+
 def test_client_wall_clock_is_the_fallback_and_says_so(endpoint):
     SCRIPT["chunks"] = [delta(content="hi", finish="stop")]
     usage = generator(endpoint).complete("hi").usage
