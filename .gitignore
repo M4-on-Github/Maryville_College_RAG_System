@@ -41,6 +41,8 @@ corpus/.crawl_pass.json
 corpus/extracted/
 corpus/chunks.jsonl
 corpus/baseline_chunks.jsonl
+corpus/chunks_no_boilerplate.jsonl
+corpus/baseline_chunks_no_boilerplate.jsonl
 *.warc
 *.warc.gz
 

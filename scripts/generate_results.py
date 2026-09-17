@@ -14,7 +14,9 @@ from mcrag.eval.results_table import write_results_md  # noqa: E402
 
 
 def main() -> int:
-    markdown = write_results_md()
+    markdown = write_results_md(
+        factorial_summary_path="runs/phase4_free_factorial_summary.json"
+    )
     print(markdown)
     return 0
 

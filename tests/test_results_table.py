@@ -7,7 +7,12 @@ from pathlib import Path
 
 import yaml
 
-from mcrag.eval.results_table import collect_runs, render_markdown, write_results_md
+from mcrag.eval.results_table import (
+    collect_runs,
+    render_factorial_section,
+    render_markdown,
+    write_results_md,
+)
 
 
 def _make_run(root: Path, run_id: str, arm: str, split: str, recall: float) -> None:
@@ -65,3 +70,49 @@ def test_write_results_md_regeneration_is_byte_identical(tmp_path: Path):
 def test_empty_runs_dir_produces_a_header_only_table(tmp_path: Path):
     md = render_markdown(collect_runs(tmp_path / "does_not_exist"))
     assert "# RESULTS" in md
+
+
+# ---- Task 18: the factorial main-effects/interactions section --------------
+
+
+def _write_factorial_summary(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "headline_k": 5,
+                "n_cells": 32,
+                "main_effects": {"reranker": 0.0573, "boilerplate": -0.0156},
+                "interactions": {"boilerplate*reranker": 0.026},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_render_factorial_section_is_empty_when_no_summary_exists(tmp_path: Path):
+    assert render_factorial_section(tmp_path / "missing.json") == ""
+
+
+def test_render_factorial_section_reports_main_effects_and_interactions(tmp_path: Path):
+    summary_path = tmp_path / "summary.json"
+    _write_factorial_summary(summary_path)
+    section = render_factorial_section(summary_path)
+    assert "Main effects" in section
+    assert "reranker" in section and "+0.0573" in section
+    assert "boilerplate*reranker" in section and "+0.0260" in section
+    assert "32 cells" in section
+
+
+def test_write_results_md_without_factorial_path_has_no_factorial_section(tmp_path: Path):
+    _make_run(tmp_path, "20260101T000000Z_abc", "dense-only", "dev", 0.7)
+    md = write_results_md(tmp_path, tmp_path / "RESULTS.md")
+    assert "Task 18" not in md
+
+
+def test_write_results_md_appends_the_factorial_section_when_given_a_real_path(tmp_path: Path):
+    _make_run(tmp_path, "20260101T000000Z_abc", "dense-only", "dev", 0.7)
+    summary_path = tmp_path / "summary.json"
+    _write_factorial_summary(summary_path)
+    md = write_results_md(tmp_path, tmp_path / "RESULTS.md", factorial_summary_path=summary_path)
+    assert "dense-only" in md  # the ordinary leaderboard is still there
+    assert "Task 18" in md  # and the factorial section is appended after it

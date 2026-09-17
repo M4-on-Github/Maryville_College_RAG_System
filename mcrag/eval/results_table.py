@@ -81,8 +81,49 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def write_results_md(runs_root: str | Path = "runs", out_path: str | Path = "RESULTS.md") -> str:
+def render_factorial_section(summary_path: str | Path) -> str:
+    """Task 18's main-effects/interactions tables, generated from the JSON
+    `scripts/run_phase4_free_ablations.py` writes -- never hand-typed, same
+    "never hand-edited" invariant `write_results_md` already holds for the
+    per-run leaderboard above it. Returns "" if the file doesn't exist yet,
+    so `write_results_md` stays a no-op addition before T18 has run.
+    """
+    path = Path(summary_path)
+    if not path.exists():
+        return ""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    lines = [
+        "",
+        "## Task 18: free retrieval factorial -- main effects and interactions",
+        "",
+        f"`all_golds_retrieved@{data['headline_k']}`, {data['n_cells']} cells, "
+        "dev split, zero generation quota. Effects are in the metric's own "
+        "units (a difference of means, PLAN Sec 4b's \"worth +X\" framing); "
+        "interactions follow the standard half-the-difference-of-simple-effects "
+        "convention -- see `mcrag.eval.factorial`.",
+        "",
+        "### Main effects",
+        "",
+        "| factor | effect |",
+        "|---|---|",
+    ]
+    for factor, effect in sorted(data["main_effects"].items(), key=lambda kv: -abs(kv[1])):
+        lines.append(f"| {factor} | {effect:+.4f} |")
+    lines += ["", "### Two-way interactions", "", "| factors | effect |", "|---|---|"]
+    for pair, effect in sorted(data["interactions"].items(), key=lambda kv: -abs(kv[1])):
+        lines.append(f"| {pair} | {effect:+.4f} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_results_md(
+    runs_root: str | Path = "runs",
+    out_path: str | Path = "RESULTS.md",
+    factorial_summary_path: str | Path | None = None,
+) -> str:
     runs = collect_runs(runs_root)
     markdown = render_markdown(runs)
+    if factorial_summary_path is not None:
+        markdown += render_factorial_section(factorial_summary_path)
     Path(out_path).write_text(markdown, encoding="utf-8")
     return markdown

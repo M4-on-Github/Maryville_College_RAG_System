@@ -701,18 +701,62 @@ identical final `metrics.json` — not merely "no crash," but no divergence.
 blind spot on interactions. Run the full crossing (PLAN §Phase 4).
 
 **Acceptance criteria:**
-- [ ] **Index-time factors crossed:** boilerplate on/off × chunking scheme → 4 index builds
-- [ ] **Query-time factors crossed:** reranker × fusion mode × silo boost → 8 configs per index
-- [ ] All 32 cells evaluated; **`k` swept nested within a cell**, not as an orthogonal factor (the `(chunk_size, k)` coupling makes it non-orthogonal — §2c)
-- [ ] **Two-way interactions estimated and reported**, not just main effects
-- [ ] Every run logged with `corpus.lock` + `split.lock`, scored on dev
-- [ ] Zero generation calls across the entire set
-- [ ] Retrieval config frozen and recorded in `decisions/` at the end
+- [x] **Index-time factors crossed:** boilerplate on/off × chunking scheme → 4 index builds
+- [x] **Query-time factors crossed:** reranker × fusion mode × silo boost → 8 configs per index
+- [x] All 32 cells evaluated; **`k` swept nested within a cell**, not as an orthogonal factor (the `(chunk_size, k)` coupling makes it non-orthogonal — §2c)
+- [x] **Two-way interactions estimated and reported**, not just main effects
+- [x] Every run logged with `corpus.lock` + `split.lock`, scored on dev
+- [x] Zero generation calls across the entire set
+- [x] Retrieval config frozen and recorded in `decisions/` at the end
 
 **Verification:** `RESULTS.md` carries a main-effects table **and** an
 interaction table; cell count is exactly 32; quota consumption is exactly zero.
 
 **Dependencies:** T17, Checkpoint D · **Scope:** L
+
+**What running this for real found:** the two index-time cells T9/T15 didn't
+already build (boilerplate OFF × each chunker) came from
+`scripts/extract_corpus.py --no-boilerplate-filter` (a flag that already
+existed) + a new `scripts/build_ablation_corpora.py`. Three new retrieval
+seams had to be built to have a query-time factorial at all —
+`mcrag/retrieval/fusion.py` (`RRFFuser`), `mcrag/retrieval/reranker.py`
+(`IdentityReranker` + a local `CrossEncoderReranker`, zero quota, zero
+network once the model is cached — see the caught bug below), and
+`mcrag/retrieval/silo_boost.py` (`SiloBoostReranker`, a soft, additive boost
+toward the candidate list's own modal silo, since no query-side silo
+classifier exists in the project) — plus `mcrag/eval/factorial.py`, the
+standard 2-level coded-contrast main-effects/interaction analysis, and
+`scripts/run_phase4_free_ablations.py`, the 32-cell driver built on T17's
+`run_arm`. All new modules are unit-tested (fusion, reranker, silo_boost,
+factorial: 31 tests) independent of the real sweep.
+
+Two real bugs surfaced running this for real, both fixed: `extract_corpus.py
+--no-boilerplate-filter` silently overwrites `corpus/manifest.jsonl` (the
+*production* manifest) with the boilerplate-off run's per-page outcomes as a
+side effect — reverted with `git checkout`, documented in the driver
+script's docstring so it isn't repeated; and the first full sweep crashed on
+a transient DNS hiccup because `CrossEncoderReranker` re-checked Hugging
+Face Hub for a newer model version on every one of its 16 constructions even
+though the weights were already cached — fixed by forcing
+`HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`, which is also the more honest
+posture for a task whose entire acceptance criterion is "zero quota": it
+should mean zero network dependency too, not just zero LLM spend. T17's
+resume-by-config-hash picked the sweep back up exactly where it crashed with
+no duplicate work.
+
+Real dev-split numbers, full 32-cell table, main effects, interactions, and
+the frozen config with an explicit per-factor "why this lost" for every
+rejected option: `decisions/0007-retrieval-config-freeze.md`. Headline:
+reranker (+0.057) and fusion (+0.047) are the two real levers; the naive
+`FixedSizeChunker(512)` edges out the production `ParagraphChunker`
+(+0.010) and boilerplate-OFF edges out boilerplate-ON (net effect of
+stripping is −0.016) — both flagged as possible `all_golds_retrieved@k`
+chunk-size artifacts rather than settled claims, to be checked against
+T20's real generation-quality numbers, not just asserted. Frozen config:
+boilerplate OFF, `FixedSizeChunker(512)`, RRF fusion ON, reranker OFF, silo
+boost OFF — the cheapest of four cells tied at the top score, chosen by an
+explicit tie-break rule (dev is selection, not inference; no p-value
+anywhere in this comparison, per `decisions/0006`).
 
 ## Task 19: Generation scoring ladder
 

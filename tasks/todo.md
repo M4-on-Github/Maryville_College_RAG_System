@@ -36,7 +36,7 @@ Design rationale lives in `PLAN.md`.
 
 ## Phase 4 — Ablations
 - [x] T17 · Ablation runner, resumable + cached (M) — `mcrag/eval/ablation_runner.py`: `find_or_create_run_dir` (resume by config-hash suffix, not timestamp), `GenerationCache` keyed `(model, digest, prompt_hash)` shared across a whole sweep, `run_arm`/`run_matrix` + `SweepPaused` for a clean quota-wall stop. Deliberately generic — no retrieval/generation logic, just the orchestration T18+ plug `evaluate_fn` into. `tests/test_ablation_runner.py` (13) proves clean-vs-resumed-sweep metrics are identical
-- [ ] T18 · Free retrieval ablations — **factorial, 32 cells, not OFAT** (L)
+- [x] T18 · Free retrieval ablations — **factorial, 32 cells, not OFAT** (L) — 2^5 design (boilerplate × chunking × reranker × fusion × silo_boost), dev split, zero quota/zero network. New seams: `mcrag/retrieval/{fusion,reranker,silo_boost}.py`, `mcrag/eval/factorial.py` (main effects + 2-way interactions). Frozen config (`decisions/0007`): boilerplate OFF, `FixedSizeChunker(512)`, RRF fusion ON, reranker OFF, silo boost OFF — chosen by an explicit tie-break rule among 4 cells tied at 0.708, with a per-factor "why this lost" recorded for every rejected option, not just the winner
 - [ ] T19 · Generation scoring ladder (M)
 - [ ] T20 · Phase 3c generation baseline (S)
 - [ ] T21 · τ calibration study (M)
