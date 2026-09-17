@@ -1,0 +1,11 @@
+{
+  "detail": {
+    "splits": [
+      "train",
+      "dev"
+    ],
+    "test_evaluated": false
+  },
+  "digest": "044615d51d4d074a0954f89e8e47a3afc4d20c021f460d8b77b65c41350c911d",
+  "kind": "split"
+}

@@ -75,6 +75,29 @@ def test_cross_encoder_reranker_is_a_no_op_with_no_scorable_hits():
     assert reranker.rerank("q", hits, k=2) == hits
 
 
+def test_score_pairs_returns_raw_scores_in_input_order_without_reordering():
+    reranker = CrossEncoderReranker()
+    fake_model = MagicMock()
+    fake_model.predict.return_value = [-3.5, 7.25]
+    reranker._model = fake_model
+    assert reranker.score_pairs([("q", "weak"), ("q", "strong")]) == [-3.5, 7.25]
+
+
+def test_score_pairs_on_no_pairs_never_touches_the_model():
+    reranker = CrossEncoderReranker()
+    assert reranker.score_pairs([]) == []
+    assert reranker._model is None
+
+
+def test_count_truncated_flags_pairs_over_the_model_limit():
+    reranker = CrossEncoderReranker()
+    fake_model = MagicMock()
+    fake_model.tokenizer = lambda q, p: {"input_ids": (q + " " + p).split()}
+    fake_model.tokenizer.model_max_length = 4
+    reranker._model = fake_model
+    assert reranker.count_truncated([("q", "one two"), ("q", "one two three four five")]) == 1
+
+
 def test_cross_encoder_reranker_truncates_to_k():
     reranker = CrossEncoderReranker()
     fake_model = MagicMock()

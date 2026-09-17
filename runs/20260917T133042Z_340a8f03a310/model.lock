@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "cross_encoder": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "embedder": "BAAI/bge-base-en-v1.5"
+  },
+  "digest": "BAAI/bge-base-en-v1.5+cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "kind": "model"
+}

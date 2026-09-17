@@ -145,3 +145,27 @@ change made after a T22 result would not be.
    difference inside the null-arm interval (control vs. a rerun of itself) is
    reported as indistinguishable from rerun noise, whatever its point estimate.
 3. Unchanged: the test split is still spent once, and still only on the table above.
+
+## Addendum 2 — 2026-09-17, after Task 21 (`decisions/0009`)
+
+Added, not edited in. Written after Task 21's train + dev results, before the
+test split was touched and before any Phase 4 generation comparison.
+
+1. **τ operating point lowered from ≥95% to ≥80% precision** (human decision,
+   post hoc). The pre-registered 95% analysis found no retrieval-score gate at
+   any useful coverage: its rule's pick would have refused 97% of answerable
+   questions. This supersedes the 95% figure in both places it appears
+   above: the primary abstention metric (now **coverage at ≥80% precision**)
+   and "τ operating point, restated". What both say otherwise still stands:
+   a stated floor, not a taste judgment, and not re-litigated per ablation.
+2. **Row 3 kept, at the new floor.** On the test split, compare raw, normalized,
+   margin and percentile on coverage at ≥80% precision (paired bootstrap), each
+   at its τ fitted on train + dev. Raw is added because it is the adopted gate.
+   Train + dev already found all three original candidates dominated by raw.
+   Re-running on untouched data costs no quota and is the only clean check of
+   that finding.
+3. **Row 4 kept, with the adopted gate:** the raw cross-encoder at τ = 4.96 vs
+   always-answer. Outcomes: coverage, precision, false-refusal rate, and refusal
+   correctness (McNemar). This is the gate's first clean estimate. Its
+   out-of-fold precision on train + dev, 0.786 [0.655, 0.905], does not meet
+   the 80% floor, and the test result is reported against that floor either way.

@@ -870,14 +870,43 @@ recorded now, before any arm result exists.
 ## Task 21: τ calibration study
 
 **Acceptance criteria:**
-- [ ] All three candidates tested: per-query normalisation, top1−top2 margin, percentile
-- [ ] Correct/false-refusal curve computed **offline from stored retrieval scores** (near-zero quota)
-- [ ] Model-initiated refusals measured separately from threshold-gated ones
-- [ ] Chosen method and rationale recorded in `decisions/`
+- [x] All three candidates tested: per-query normalisation, top1−top2 margin, percentile
+- [x] Correct/false-refusal curve computed **offline from stored retrieval scores** (near-zero quota) — zero quota; scores were never stored before, so recomputed and now stored per question
+- [x] Model-initiated refusals measured separately from threshold-gated ones
+- [x] Chosen method and rationale recorded in `decisions/` — **post hoc** (`decisions/0009` Decision): raw cross-encoder, τ = 4.96, at a floor lowered from 95% to 80% by the human reviewer after the pre-registered analysis found no usable gate
 
-**Verification:** Tradeoff curves plotted for all three; selection justified against the curve.
+**Verification:** Tradeoff curves plotted for all three; selection justified against the curve. — Curves plotted (`tau_curves.png` pre-registered, `tau_curves_floor80_raw_eligible.png` post hoc). The pre-registered selection (margin, τ 12.44) was **not** justified by the curve, since raw dominates the usable range. The post-hoc selection is raw, the curve's best, though it misses 80% out of fold (0.786 [0.655, 0.905]).
 
 **Dependencies:** T20 · **Scope:** M
+
+**What running this found** (pre-registered design and full results: `decisions/0009`):
+three design facts first. PLAN gates on a rerank score, but `decisions/0007` froze the reranker
+off. No retrieval score had ever been stored. The train split had never been used. With the
+reviewer: label = in scope with all evidence retrieved; signal = cross-encoder logits (MaxP
+windows, 0 truncated pairs), dense cosine as a non-selectable reference; fit on train + dev,
+5-fold CV. Everything was written down before any score was computed.
+
+- **No method meets 95% precision out of fold.** The rule's fallback picks margin (τ 12.44),
+  which answers 2% of questions and refuses 97% of answerable ones. The percentile method
+  saturated and never answered, as predicted in advance.
+- **The calibration methods destroy out-of-scope detection** (exploratory): cross-encoder AUC
+  in-scope vs out-of-scope falls from 0.717 raw to 0.467 normalized and 0.501 margin. For an
+  out-of-scope question every candidate scores low, so the best one still stands out from its
+  pool. Normalizing removes the absolute "nothing is relevant" level abstention needs. PLAN
+  Sec 4e's premise is backwards for this use.
+- **Triage doesn't rescue retrieval scores.** At a 95% floor on both sides, even the best
+  signal leaves 95% of questions in the uncertain band (63% at 80%), so the judge would run
+  on nearly every query.
+- **The model's own refusals were precise:** 9 of 9 on dev were should-refuse, catching 9 of 26.
+- Consequence: on this corpus a retrieval-score threshold cannot reach 95%; answer-level
+  signals (self-refusal, NLI or LLM answerability) are the route to higher precision.
+
+**Decision (human, post hoc, 2026-09-17):** lower the floor to 80%. Re-selected from the stored
+scores (procedure written before it was computed; raw made eligible): **raw cross-encoder,
+τ = 4.96.** Out of fold it answers 23.3% of questions at 0.786 precision, missing 80% by 1.4
+points, and refuses 62% of answerable ones. It is not one of PLAN's three methods, which all
+lost to it. `decisions/0006` has a second dated addendum: 80% operating point; test-split rows
+3–4 kept, with this gate. Clean estimate only from test, since τ was fitted on train + dev.
 
 ## Task 22: Metered ablations (#6, #8, #9, #10)
 
@@ -893,6 +922,7 @@ recorded now, before any arm result exists.
 - [ ] **Tier 1 faithfulness reported only as a paired arm difference, labelled unvalidated**, computed over answered questions with `refusal_rate` beside it. Never quoted as an absolute grounding rate
 - [ ] Noise and reproducibility checks **never go through Task 17's generation cache**, which makes reruns identical by construction and would hide exactly the variance being measured
 - [ ] Reformulation step 5 (de-contextualization) is compared against the Task 20 control, which already passes history to the prompt but not to retrieval. The arm changes only whether retrieval sees a rewritten query
+- [ ] #9 evaluates the gate Task 21 adopted (raw cross-encoder, τ = 4.96, 80% floor; `decisions/0009`) against always-answer, and labels its dev numbers **in-sample**, since τ was fitted on train + dev
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
@@ -1002,7 +1032,7 @@ surface instead of a spinner — widget, site and terminal all get it free.
 ## Task 27: Refusal path + office routing
 
 **Acceptance criteria:**
-- [ ] Threshold, answerability gate and model-initiated refusal all wired, with **any-signal-wins** precedence (§4e)
+- [ ] Threshold, answerability gate and model-initiated refusal all wired, with **any-signal-wins** precedence (§4e). The threshold is Task 21's: raw cross-encoder MaxP score over the frozen top 5, refuse below τ = 4.96 (`decisions/0009`). It adds a local cross-encoder pass per answer, so T24 measures that latency
 - [ ] All three signals plus the resolved winner logged per request
 - [ ] Refusal resolves the owning office via `data/offices.yaml` (T8) and emits contact fields
 - [ ] Unroutable refusal falls back to a general contact rather than emitting an empty office

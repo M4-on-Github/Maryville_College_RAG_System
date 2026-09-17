@@ -23,6 +23,7 @@ index = ["lancedb>=0.6", "sentence-transformers>=2.7", "rank-bm25>=0.2.2"]
 # "Cannot find the requested files" / "Unrecognized processing class" error
 # that looks like a real model incompatibility but isn't -- Task 19 hit this).
 scoring = ["sentencepiece>=0.2", "brotli>=1.1"]
+analysis = ["matplotlib>=3.8"]  # Task 21's tradeoff curves
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]
