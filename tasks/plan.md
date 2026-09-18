@@ -985,7 +985,7 @@ on `gemma4:31b` (180s default, never calibrated against a model other than
 
 ### ✅ Checkpoint E — before touching test
 - [ ] Full config frozen — retrieval side settled (`decisions/0007` unchanged, `decisions/0011` found no reformulation rung worth keeping); generation-model choice still open — `decisions/0010` reports gemma4:31b matches gpt-oss:20b's faithfulness at far lower cost/latency but explicitly defers the adoption decision to this checkpoint
-- [ ] Every ablation logged and reproducible
+- [x] Every ablation logged and reproducible — spot-checked every decisions doc's cited numbers against the run dirs/summary JSONs they reference (`decisions/0007`'s tie-break cell, `decisions/0009`'s τ=4.96 row, `decisions/0010`'s #10 headline deltas, `decisions/0011`'s rung comparison): all match on disk. Found and fixed one real gap — `runs/phase4_free_factorial_summary.json`, the file `decisions/0007` cites as its "machine-readable source," was never committed when T18 landed; force-added now
 - [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
 
 ## Task 22b: Test-split confirmatory pass
