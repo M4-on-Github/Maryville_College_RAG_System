@@ -1,6 +1,6 @@
 # 0010 — Metered ablations #8, #9, #10 (Task 22)
 
-**Date:** 2026-09-17 · **Status:** run complete, results recorded. Config selection for Checkpoint E is a separate, still-open decision — this doc reports findings, it does not freeze a config.
+**Date:** 2026-09-17 · **Status:** run complete, results recorded. Generation-model choice for Checkpoint E, originally left open here, was decided 2026-09-18 — see "Adopted" below.
 
 ## Context
 
@@ -260,3 +260,32 @@ regardless of slice — including cells with large point estimates (e.g.
 `gpt-oss:120b` on `temporal`, −0.500 faithfulness at n=5). Reported as
 exploratory, not as a slice-level finding: at dev-split-divided-by-seven-slices
 sample sizes, no per-slice comparison here clears its own noise bar.
+
+### Adopted (human decision, Checkpoint E)
+
+**Generation model: `gemma4:31b`, replacing `gpt-oss:20b`.** Faithfulness is
+statistically indistinguishable from the prior baseline (−0.033
+[−0.151, +0.081], interval inside the noise floor) while completion tokens
+drop by ~301/question and wall-clock by ~4.4s/question. The mechanism is not
+"bigger model, more efficient" — `gemma4:31b` has *more* parameters than
+`gpt-oss:20b`, not fewer. It is that `gpt-oss:20b` spends 83% of its output
+on a hidden chain-of-thought reasoning channel (`decisions/0008`'s Task 20
+finding) on every query regardless of need, and `gemma4:31b`'s
+reasoning-channel share on this endpoint is 73 points lower — the cost/speed
+win is a token-verbosity difference, not a capability difference, and stated
+here so it isn't misread as one later.
+
+What this decision is not:
+- **Not** validated by slice — PLAN Sec 4a #10 predicted abstention/cross-silo
+  slices would separate the models; every per-slice cell here is n=3–16 and
+  underpowered, so a slice-specific regression in production is not ruled
+  out by this doc.
+- **Not** a claim that `wall_s`'s full magnitude is attributable to token
+  count alone — part of it may be Ollama Cloud serving-side differences
+  between models, not separable from the data collected here.
+- **Not** re-validated on retrieval — retrieval is model-independent and
+  frozen (`decisions/0007`); this decision touches generation only.
+
+This closes Checkpoint E's "full config frozen" item (`tasks/plan.md`): the
+project's frozen config is now `decisions/0007`'s retrieval (unchanged),
+`decisions/0011`'s no-reformulation, and `gemma4:31b` generation.

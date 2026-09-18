@@ -933,7 +933,7 @@ to a new task, **T22b**, after Checkpoint E. `docs/quota-calibration.md`'s
 - [x] Noise and reproducibility checks **never go through Task 17's generation cache** — this driver never constructs one
 - [x] Reformulation step 5 (de-contextualization) is compared against the Task 20 control — **moot**: the ladder never reaches step 5; rungs 1-2 already failed to clear the bar (`decisions/0011`)
 - [x] #9 evaluates the gate Task 21 adopted against always-answer, in-sample — **found a real tension, not a simple verdict**: Tier 0's coarse `refusal_correct` drops sharply (−0.400) under the gate, while the gate's own stricter precision improves as designed (0.567→0.938); both are correct, they measure different things (`decisions/0010`)
-- [x] Every comparison is selection, not inference (effect size + CI only) — retrieval side of the write-up is settled: `decisions/0007`'s frozen config, unchanged, no reformulation kept (`decisions/0011`). Generation-model choice is `decisions/0010`'s **still-open** decision (gpt-oss:20b remains "current baseline"; gemma4:31b is a reported recommendation, not yet adopted) — Checkpoint E is where that gets decided
+- [x] Every comparison is selection, not inference (effect size + CI only) — the single-winning-config write-up for Checkpoint E: `decisions/0007`'s frozen retrieval config, unchanged, no reformulation kept (`decisions/0011`), generation model switched to **`gemma4:31b`** (human decision, `decisions/0010`'s "Adopted" section)
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
@@ -984,7 +984,7 @@ on `gemma4:31b` (180s default, never calibrated against a model other than
   exactly as `decisions/0007` froze it.
 
 ### ✅ Checkpoint E — before touching test
-- [ ] Full config frozen — retrieval side settled (`decisions/0007` unchanged, `decisions/0011` found no reformulation rung worth keeping); generation-model choice still open — `decisions/0010` reports gemma4:31b matches gpt-oss:20b's faithfulness at far lower cost/latency but explicitly defers the adoption decision to this checkpoint
+- [x] Full config frozen — `decisions/0007`'s retrieval config, unchanged; `decisions/0011`'s no-reformulation; `decisions/0010`'s generation model switched to **`gemma4:31b`** (human decision, 2026-09-18: faithfulness tied within noise, ~301 fewer completion tokens and ~4.4s faster per question — driven by a 73pp-lower reasoning-channel share, not parameter count; by-slice behavior not validated, n=3–16/cell)
 - [x] Every ablation logged and reproducible — spot-checked every decisions doc's cited numbers against the run dirs/summary JSONs they reference (`decisions/0007`'s tie-break cell, `decisions/0009`'s τ=4.96 row, `decisions/0010`'s #10 headline deltas, `decisions/0011`'s rung comparison): all match on disk. Found and fixed one real gap — `runs/phase4_free_factorial_summary.json`, the file `decisions/0007` cites as its "machine-readable source," was never committed when T18 landed; force-added now
 - [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
 
