@@ -169,3 +169,41 @@ test split was touched and before any Phase 4 generation comparison.
    correctness (McNemar). This is the gate's first clean estimate. Its
    out-of-fold precision on train + dev, 0.786 [0.655, 0.905], does not meet
    the 80% floor, and the test result is reported against that floor either way.
+
+## Addendum 3 — 2026-09-17, resolving a dev/test contradiction before Task 22
+
+Added, not edited in. Written before Task 22 has run anything, so it is still
+a pre-registration change, not a post-hoc one.
+
+**The contradiction.** `tasks/plan.md`'s Task 22 acceptance criteria say
+"All run on dev, never test," and Checkpoint E (immediately after Task 22)
+says "Test split evaluated exactly once, after this checkpoint." But this
+doc's original comparison table below, `docs/quota-calibration.md`'s budget
+section, and PLAN Sec 4a all sized Task 22's ten arms against the
+**120-question test split**. Both cannot be true. Human decision: **the
+acceptance criterion and the checkpoint are right. Task 22 runs on dev.**
+
+**Consequence: rows 1–5 below are re-cast as dev-split selection, not
+test-split inference**, matching "Dev is selection, not inference" above,
+which already governed everything else in this doc — the original table was
+the one inconsistent part of it. No comparison in Task 22 carries a p-value.
+Row 3 (τ method selection) no longer needs a separate run: Task 21
+(`decisions/0009`) already resolved it, on train+dev, pre-registered, before
+Task 22 started.
+
+**A new task fills the gap PLAN Sec 4a itself named** ("reserve test for one
+final pass") **but `tasks/todo.md` never scheduled: Task 22b, the test-split
+confirmatory pass**, between Checkpoint E and Phase 5. It spends the
+120-question test split exactly once, evaluating the *single* fully frozen
+Checkpoint-E configuration against the Task 20 baseline — not each of Task
+22's dev-side comparisons separately, which would spend test multiple times.
+This is where real paired significance tests (exact McNemar, paired
+bootstrap) finally apply, per this doc's original "Comparisons the test
+split will be spent on" framing — just relocated to the task that actually
+touches test.
+
+`docs/quota-calibration.md`'s "metered ablation program is 10 arms on the
+120-question test split" line is superseded: Task 22's ten-ish dev-side arms
+cost dev-split passes (near-zero incremental quota beyond what dev already
+costs); Task 22b's one-time test pass costs one ~120-question pass, ~5
+minutes wall-clock, per that doc's own budget table.

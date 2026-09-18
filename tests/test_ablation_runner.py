@@ -15,9 +15,12 @@ from mcrag.config import Config
 from mcrag.eval.ablation_runner import (
     GenerationCache,
     SweepPaused,
+    build_work_queue,
     find_or_create_run_dir,
     run_arm,
+    run_interleaved,
     run_matrix,
+    unquarantined,
 )
 from mcrag.eval.stats import bootstrap_ci
 from mcrag.runlog import RunDir
@@ -257,3 +260,193 @@ def test_run_matrix_final_metrics_are_identical_whether_or_not_a_wall_was_hit(tm
     clean_metrics = [rd.read_metrics() for rd in clean_results.values()]
     resumed_metrics = [rd.read_metrics() for rd in resumed_results.values()]
     assert clean_metrics == resumed_metrics
+
+
+# ---- build_work_queue / run_interleaved: Task 22 -------------------------
+
+
+def test_build_work_queue_is_question_major():
+    configs = [_config("a"), _config("b"), _config("c")]
+    questions = [_q("q1"), _q("q2")]
+    queue = build_work_queue(configs, questions)
+    assert [(c.arm, q.qid) for c, q in queue] == [
+        ("a", "q1"), ("b", "q1"), ("c", "q1"),
+        ("a", "q2"), ("b", "q2"), ("c", "q2"),
+    ]
+
+
+def test_build_work_queue_never_repeats_a_config_consecutively():
+    configs = [_config(f"arm-{i}") for i in range(5)]
+    questions = [_q(f"q{i}") for i in range(7)]
+    queue = build_work_queue(configs, questions)
+    arms = [c.arm for c, _ in queue]
+    assert all(a != b for a, b in zip(arms, arms[1:]))
+    assert len(queue) == len(configs) * len(questions)
+
+
+def test_run_interleaved_rejects_a_single_config(tmp_path: Path):
+    with pytest.raises(ValueError, match="at least two"):
+        run_interleaved(
+            [_config("solo")], [_q("q1")],
+            lambda c: (lambda q: {"query_id": q.qid}), _summarize,
+            expected_model="m", root=tmp_path,
+        )
+
+
+def test_run_interleaved_calls_in_question_major_order(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+    questions = [_q("q1"), _q("q2"), _q("q3")]
+    calls: list[tuple[str, str]] = []
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            calls.append((config.arm, q.qid))
+            return {"query_id": q.qid, "score": 1.0}
+        return evaluate_fn
+
+    run_interleaved(configs, questions, evaluate_fn_for, _summarize, expected_model="m", root=tmp_path)
+    assert calls == [("a", "q1"), ("b", "q1"), ("a", "q2"), ("b", "q2"), ("a", "q3"), ("b", "q3")]
+
+
+def test_run_interleaved_resumes_without_duplicating_calls_and_matches_a_clean_run(tmp_path: Path):
+    configs_clean = [_config("clean-a"), _config("clean-b")]
+    configs_resumed = [_config("resumed-a"), _config("resumed-b")]
+    questions = [_q(f"q{i}") for i in range(1, 5)]
+
+    class QuotaWall(RuntimeError):
+        pass
+
+    tripped: set[str] = set()
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            if config.arm == "resumed-a" and q.qid == "q3" and config.arm not in tripped:
+                tripped.add(config.arm)
+                raise QuotaWall("wall")
+            return {"query_id": q.qid, "score": float(q.qid[-1])}
+        return evaluate_fn
+
+    clean = run_interleaved(configs_clean, questions, evaluate_fn_for, _summarize, expected_model="m", root=tmp_path / "clean")
+
+    calls: list[tuple[str, str]] = []
+
+    def counting_evaluate_fn_for(config: Config):
+        inner = evaluate_fn_for(config)
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            calls.append((config.arm, q.qid))
+            return inner(q)
+        return evaluate_fn
+
+    with pytest.raises(SweepPaused):
+        run_interleaved(configs_resumed, questions, counting_evaluate_fn_for, _summarize, expected_model="m", root=tmp_path / "resumed", quota_errors=(QuotaWall,))
+    calls.clear()
+    resumed = run_interleaved(configs_resumed, questions, counting_evaluate_fn_for, _summarize, expected_model="m", root=tmp_path / "resumed", quota_errors=(QuotaWall,))
+
+    assert ("resumed-a", "q1") not in calls  # already done before the wall; never re-called
+    assert ("resumed-a", "q3") in calls  # the one that actually failed reruns
+
+    clean_metrics = [rd.read_metrics() for rd in clean.values()]
+    resumed_metrics = [rd.read_metrics() for rd in resumed.values()]
+    assert clean_metrics == resumed_metrics
+
+
+def test_run_interleaved_quarantines_a_record_whose_model_does_not_match(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+    questions = [_q("q1"), _q("q2")]
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            # arm "b" drifts on q2 only
+            model = "drifted-model" if (config.arm == "b" and q.qid == "q2") else "gpt-oss:20b"
+            return {"query_id": q.qid, "score": 1.0, "model": model}
+        return evaluate_fn
+
+    results = run_interleaved(configs, questions, evaluate_fn_for, _summarize, expected_model="gpt-oss:20b", root=tmp_path)
+    records_b = {r["query_id"]: r for r in results["b"].records()}
+    assert records_b["q1"].get("quarantined") is not True
+    assert records_b["q2"]["quarantined"] is True
+    assert "drifted-model" in records_b["q2"]["quarantine_reason"]
+    # the whole run continues -- arm "a" and q1 on arm "b" are untouched
+    records_a = {r["query_id"]: r for r in results["a"].records()}
+    assert records_a["q1"].get("quarantined") is not True
+    assert records_a["q2"].get("quarantined") is not True
+
+
+def test_run_interleaved_never_quarantines_a_record_with_no_model_field(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+    questions = [_q("q1")]
+
+    def evaluate_fn_for(config: Config):
+        return lambda q: {"query_id": q.qid, "score": 1.0}  # no "model" key at all
+
+    results = run_interleaved(configs, questions, evaluate_fn_for, _summarize, expected_model="gpt-oss:20b", root=tmp_path)
+    for run_dir in results.values():
+        assert all(not r.get("quarantined") for r in run_dir.records())
+
+
+def test_run_interleaved_a_quarantined_record_is_not_retried_on_resume(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+    questions = [_q("q1")]
+    calls: list[str] = []
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            calls.append(config.arm)
+            return {"query_id": q.qid, "score": 1.0, "model": "drifted" if config.arm == "b" else "gpt-oss:20b"}
+        return evaluate_fn
+
+    run_interleaved(configs, questions, evaluate_fn_for, _summarize, expected_model="gpt-oss:20b", root=tmp_path)
+    calls.clear()
+    run_interleaved(configs, questions, evaluate_fn_for, _summarize, expected_model="gpt-oss:20b", root=tmp_path)
+    assert calls == []  # both arms' q1 already on disk, quarantined or not
+
+
+def test_unquarantined_filters_flagged_records_only():
+    records = [{"query_id": "q1", "score": 1.0}, {"query_id": "q2", "score": 0.0, "quarantined": True}]
+    assert unquarantined(records) == [records[0]]
+
+
+def test_run_interleaved_expected_model_as_dict_checks_each_arm_against_its_own(tmp_path: Path):
+    configs = [_config("gpt-oss-20b"), _config("gemma4-31b")]
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            model = "gpt-oss:20b" if config.arm == "gpt-oss-20b" else "gemma4:31b"
+            return {"query_id": q.qid, "score": 1.0, "model": model}
+        return evaluate_fn
+
+    results = run_interleaved(
+        configs, [_q("q1")], evaluate_fn_for, _summarize,
+        expected_model={"gpt-oss-20b": "gpt-oss:20b", "gemma4-31b": "gemma4:31b"},
+        root=tmp_path,
+    )
+    for arm in ("gpt-oss-20b", "gemma4-31b"):
+        record = next(iter(results[arm].records()))
+        assert record.get("quarantined") is not True
+
+
+def test_run_interleaved_dict_expected_model_requires_every_arm_present(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+    with pytest.raises(ValueError, match="missing arm"):
+        run_interleaved(
+            configs, [_q("q1")], lambda c: (lambda q: {"query_id": q.qid}), _summarize,
+            expected_model={"a": "model-a"}, root=tmp_path,
+        )
+
+
+def test_run_interleaved_dict_expected_model_still_quarantines_real_drift(tmp_path: Path):
+    configs = [_config("a"), _config("b")]
+
+    def evaluate_fn_for(config: Config):
+        def evaluate_fn(q: GoldQuestion) -> dict:
+            return {"query_id": q.qid, "score": 1.0, "model": "wrong-model" if config.arm == "a" else "model-b"}
+        return evaluate_fn
+
+    results = run_interleaved(
+        configs, [_q("q1")], evaluate_fn_for, _summarize,
+        expected_model={"a": "model-a", "b": "model-b"}, root=tmp_path,
+    )
+    record_a = next(iter(results["a"].records()))
+    record_b = next(iter(results["b"].records()))
+    assert record_a["quarantined"] is True
+    assert record_b.get("quarantined") is not True

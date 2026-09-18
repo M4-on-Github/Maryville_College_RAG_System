@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "arm": "free_form_nemotron3_nano_30b",
+    "generator": "nemotron-3-nano:30b"
+  },
+  "digest": "nemotron-3-nano:30b",
+  "kind": "model"
+}

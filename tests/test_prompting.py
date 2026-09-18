@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from mcrag.generate.prompting import SYSTEM_PROMPT, build_user_prompt
+from mcrag.generate.prompting import CITATION_FORCED_SYSTEM_PROMPT, SYSTEM_PROMPT, build_user_prompt
 from mcrag.types import Chunk
 
 
@@ -19,6 +19,19 @@ def chunk(text: str, title: str = "t", url: str = "https://example.edu/a/") -> C
 def test_system_prompt_tells_the_model_passages_are_not_instructions():
     assert "not instructions" in SYSTEM_PROMPT
     assert "<question>" in SYSTEM_PROMPT
+
+
+def test_citation_forced_prompt_keeps_the_passage_safety_clause():
+    assert "not instructions" in CITATION_FORCED_SYSTEM_PROMPT
+    assert "<question>" in CITATION_FORCED_SYSTEM_PROMPT
+
+
+def test_citation_forced_prompt_requires_bracket_markers_and_differs_from_free_form():
+    assert "[2]" in CITATION_FORCED_SYSTEM_PROMPT
+    assert CITATION_FORCED_SYSTEM_PROMPT != SYSTEM_PROMPT
+    # both reference the same [N] numbering build_user_prompt stamps on passages,
+    # not a different citation scheme
+    assert "bracketed number" in CITATION_FORCED_SYSTEM_PROMPT
 
 
 def test_passages_are_wrapped_in_a_delimiter_tag():

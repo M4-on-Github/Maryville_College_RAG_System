@@ -177,6 +177,99 @@ def run_arm(
     return run_dir
 
 
+def build_work_queue(
+    configs: list[Config], questions: list[GoldQuestion]
+) -> list[tuple[Config, GoldQuestion]]:
+    """Question-major order: every config's turn on q1, then every config's
+    turn on q2, and so on -- so no two consecutive items share a config
+    (Task 22's own verification step), and any drift in the metered backend
+    lands on all arms roughly equally instead of confounding one arm's
+    wall-clock position against another's (PLAN Sec 4, "interleave by
+    question, never by config").
+    """
+    return [(config, question) for question in questions for config in configs]
+
+
+def run_interleaved(
+    configs: list[Config],
+    questions: Iterable[GoldQuestion],
+    evaluate_fn_for: Callable[[Config], EvaluateFn],
+    summarize_fn: SummarizeFn,
+    *,
+    expected_model: str | dict[str, str],
+    root: str | Path = "runs",
+    quota_errors: tuple[type[Exception], ...] = (),
+) -> dict[str, RunDir]:
+    """Task 22: run every config's turn on one question before any config's
+    turn on the next, resuming per (config, question) pair.
+
+    **Model drift, checked per record, not pre-flight.** Nothing in the
+    metered API exposes "which model is live" without actually generating,
+    so drift can only be caught after the fact: `evaluate_fn`'s returned
+    record is expected to carry the model string the provider actually
+    answered with (`OllamaCloudGenerator`'s `Completion.model` already
+    provides this). A record whose `model` doesn't match its arm's expected
+    model is quarantined -- kept on disk, `quarantined: True`, excluded from
+    `summarize_fn`'s aggregates by the caller -- rather than voiding the arm
+    or the sweep. A record with no `model` field (a config with no
+    generation call in it, e.g. a retrieval-only arm) is never quarantined.
+
+    `expected_model` is a single string when every arm is pinned to the same
+    model (a prompt or gate ablation, say), or `{arm: model}` when arms
+    deliberately use *different* models (Task 22's #10) -- a single global
+    string there would wrongly flag every non-default arm as drifted. In
+    dict form, every config's `arm` must have an entry.
+
+    Requires at least two configs: interleaving one arm against itself is
+    meaningless, and `build_work_queue`'s no-two-consecutive-share-a-config
+    guarantee needs a second config to hold against.
+    """
+    configs = list(configs)
+    if len(configs) < 2:
+        raise ValueError("interleaving needs at least two configs")
+    if isinstance(expected_model, dict):
+        missing = [c.arm for c in configs if c.arm not in expected_model]
+        if missing:
+            raise ValueError(f"expected_model dict is missing arm(s): {missing}")
+
+    run_dirs = {c.arm: find_or_create_run_dir(c, root=root) for c in configs}
+    evaluators = {c.arm: evaluate_fn_for(c) for c in configs}
+
+    for config, question in build_work_queue(configs, list(questions)):
+        run_dir = run_dirs[config.arm]
+        if question.qid in run_dir.completed_ids():
+            continue
+        try:
+            record = evaluators[config.arm](question)
+        except quota_errors as exc:
+            raise SweepPaused(config.arm, question.qid, exc) from exc
+        expected = expected_model[config.arm] if isinstance(expected_model, dict) else expected_model
+        model_seen = record.get("model")
+        if model_seen is not None and model_seen != expected:
+            record = {
+                **record,
+                "quarantined": True,
+                "quarantine_reason": f"model drift: expected {expected!r}, saw {model_seen!r}",
+            }
+        run_dir.append(record)
+
+    results: dict[str, RunDir] = {}
+    for config in configs:
+        run_dir = run_dirs[config.arm]
+        records = list(run_dir.records())
+        metrics = summarize_fn(records)
+        run_dir.write_metrics(metrics)
+        results[config.arm] = run_dir
+    return results
+
+
+def unquarantined(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Records `run_interleaved` did not flag for model drift. `summarize_fn`
+    callers should aggregate over this, not the raw record list -- a
+    quarantined record is kept on disk for audit, never for a metric."""
+    return [r for r in records if not r.get("quarantined")]
+
+
 def run_matrix(
     configs: Iterable[Config],
     questions: Iterable[GoldQuestion],

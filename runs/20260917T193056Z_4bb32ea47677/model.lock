@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "arm": "free_form_gemma4_31b",
+    "generator": "gemma4:31b"
+  },
+  "digest": "gemma4:31b",
+  "kind": "model"
+}

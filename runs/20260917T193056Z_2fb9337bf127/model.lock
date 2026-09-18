@@ -1,0 +1,8 @@
+{
+  "detail": {
+    "arm": "free_form_120b",
+    "generator": "gpt-oss:120b"
+  },
+  "digest": "gpt-oss:120b",
+  "kind": "model"
+}

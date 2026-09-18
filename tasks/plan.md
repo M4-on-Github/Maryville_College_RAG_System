@@ -908,31 +908,95 @@ points, and refuses 62% of answerable ones. It is not one of PLAN's three method
 lost to it. `decisions/0006` has a second dated addendum: 80% operating point; test-split rows
 3–4 kept, with this gate. Clean estimate only from test, since τ was fitted on train + dev.
 
-## Task 22: Metered ablations (#6, #8, #9, #10)
+## Task 22: Metered ablations (#6, #8, #9, #10) — **dev only, selection not inference**
+
+**⚠️ Resolves a contradiction found scoping this task.** `docs/quota-calibration.md`
+and `decisions/0006`'s original comparison table sized this task's ten arms
+against the 120-question **test** split — directly contradicting this task's
+own "dev, never test" criterion and Checkpoint E's "test evaluated exactly
+once, after this checkpoint." Human decision (`decisions/0006` addendum 3):
+**this task runs entirely on dev, for selection.** The one-time test-split
+spend PLAN Sec 4a itself calls for ("reserve test for one final pass") moves
+to a new task, **T22b**, after Checkpoint E. `docs/quota-calibration.md`'s
+"10 arms on the 120-question test split" framing is superseded by that addendum.
 
 **Acceptance criteria:**
-- [ ] Query reformulation ladder, citation-forced vs free-form prompting, τ sweep, model comparison
-- [ ] All run on **dev**, never test
-- [ ] **Runs interleaved by question, never by config** — sequential arms confound config with hosted-weight drift (§Phase 4). The runner emits an interleaved work queue, and this is asserted, not left to discipline
-- [ ] `model.lock` digest re-checked mid-sweep; a change quarantines affected questions rather than the whole run
-- [ ] OFAT here is a **quota decision, recorded as such** in `decisions/`, not a design preference
-- [ ] Quality **and** cost logged per run; results presented as a Pareto frontier
-- [ ] Quota consumption tracked against the Task 3 budget
-- [ ] **Every comparison reports the measured noise floor beside its effect** (`decisions/0006` addendum). Temperature 0 isn't deterministic here (`decisions/0008`), so a difference inside the control's rerun interval is reported as indistinguishable from noise, whatever its point estimate
-- [ ] **Tier 1 faithfulness reported only as a paired arm difference, labelled unvalidated**, computed over answered questions with `refusal_rate` beside it. Never quoted as an absolute grounding rate
-- [ ] Noise and reproducibility checks **never go through Task 17's generation cache**, which makes reruns identical by construction and would hide exactly the variance being measured
-- [ ] Reformulation step 5 (de-contextualization) is compared against the Task 20 control, which already passes history to the prompt but not to retrieval. The arm changes only whether retrieval sees a rewritten query
-- [ ] #9 evaluates the gate Task 21 adopted (raw cross-encoder, τ = 4.96, 80% floor; `decisions/0009`) against always-answer, and labels its dev numbers **in-sample**, since τ was fitted on train + dev
+- [x] Citation-forced vs free-form prompting, chosen-τ-gate vs always-answer, model comparison — **done, `decisions/0010`**. **Query reformulation ladder (#6) not yet built** — scoped separately, task stays open until it lands
+- [x] All run on **dev**, never test (now unambiguous — see above)
+- [x] **Runs interleaved by question, never by config** — `mcrag.eval.ablation_runner.run_interleaved`, confirmed live during the real sweep (record counts grew roughly together across all 6 arms)
+- [x] `model.lock` digest re-checked mid-sweep; a change quarantines affected questions rather than the whole run — built as a per-arm `expected_model` dict (a single global value would have wrongly flagged every #10 arm, which deliberately mixes models); zero quarantines in the real run
+- [x] OFAT here is a **quota decision, recorded as such** in `decisions/` — `decisions/0010`
+- [x] Quality **and** cost logged per run (`wall_s`, `completion_tokens`, `reasoning_char_share` per question) — Pareto-frontier presentation still pending (needs #6 too, to be worth plotting)
+- [x] Quota consumption tracked against the Task 3 budget — 360 calls, 22.6 min, well under budget
+- [x] **Every comparison reports the measured noise floor beside its effect** — a fresh, same-session null arm (`free_form_20b_b` vs `_a`), not Task 20's older one
+- [x] **Tier 1 faithfulness reported only as a paired arm difference, labelled unvalidated**, answered questions only
+- [x] Noise and reproducibility checks **never go through Task 17's generation cache** — this driver never constructs one
+- [ ] Reformulation step 5 (de-contextualization) is compared against the Task 20 control — waits on #6
+- [x] #9 evaluates the gate Task 21 adopted against always-answer, in-sample — **found a real tension, not a simple verdict**: Tier 0's coarse `refusal_correct` drops sharply (−0.400) under the gate, while the gate's own stricter precision improves as designed (0.567→0.938); both are correct, they measure different things (`decisions/0010`)
+- [x] Every comparison is selection, not inference (effect size + CI only) — the single-winning-config write-up for Checkpoint E is still open, pending #6 and a human decision on which findings to act on
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
+— Work-queue ordering has a dedicated test (`test_build_work_queue_never_repeats_a_config_consecutively`) plus 24 more covering resumability and drift quarantine. `RESULTS.md`/Pareto frontier not yet generated — waiting on #6.
 
 **Dependencies:** T20, T21 · **Scope:** L
 
+**What running #8/#9/#10 found** (full numbers, every arm, what was rejected:
+`decisions/0010`): 360 generation calls, 22.6 min, one real bug caught and
+fixed along the way (a sign error in #9's own diff — `paired_bootstrap_comparison(a,b)`
+returns `b-a`; the arguments were passed backwards, silently computing
+`always_answer − gate` while labelled the opposite; caught because the
+printed sign didn't match the two point estimates, fixed and recomputed at
+zero quota from the already-stored records). Also fixed live: a `ReadTimeout`
+on `gemma4:31b` (180s default, never calibrated against a model other than
+`gpt-oss:20b`) crashed the first attempt instead of pausing cleanly — widened
+`quota_errors` to catch `requests.exceptions.RequestException`, raised
+`timeout_s` to 300s, resumed with zero duplicate calls.
+
+- **#8:** citation-forcing only partially works — 52.7% [42.9%, 62.4%] of
+  sentences carry a valid marker even under an explicit forced instruction,
+  with zero invalid/fabricated markers. No faithfulness or refusal-correctness
+  effect beyond noise; citation-forced answers are shorter and faster.
+- **#9:** the gate's Tier-0 `refusal_correct` and its own T21-native precision
+  move in opposite directions for the same reason — Tier 0's `expects_answer`
+  (any gold ref) is coarser than T21's `should_answer` (all gold retrieved),
+  and the gate is optimized for the latter. Not a contradiction; a measurement
+  mismatch already flagged as a risk in `decisions/0009`.
+- **#10, the headline finding: `gemma4:31b` matches `gpt-oss:20b`'s
+  faithfulness (within noise) while its reasoning-channel share collapses
+  73 points and it is both the fastest and cheapest arm.** Real, statistically
+  supported, and directly relevant to Checkpoint E. `gpt-oss:120b` and
+  `nemotron-3-nano:30b` both score measurably *lower* faithfulness than the
+  20b baseline — reported as a real per-session difference on an unvalidated
+  metric, not a verdict on model quality. By-slice breakdown (PLAN's own
+  prediction that abstention/cross-silo slices would separate models) is
+  **underpowered at n=3–16 per cell** and reported as exploratory only —
+  neither confirms nor refutes the prediction.
+
 ### ✅ Checkpoint E — before touching test
-- [ ] Full config frozen
+- [ ] Full config frozen — the single winning configuration Task 22 selected on dev
 - [ ] Every ablation logged and reproducible
-- [ ] **Test split evaluated exactly once, after this checkpoint**
+- [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
+
+## Task 22b: Test-split confirmatory pass
+
+**Description:** The "one final pass" PLAN Sec 4a itself calls for, and the
+task `tasks/todo.md` never scheduled until this contradiction was found
+scoping T22. Spends the 120-question test split **exactly once**, on the
+*single* frozen Checkpoint-E configuration — never on each of Task 22's
+dev-side comparisons separately, which would spend test multiple times and
+break the project's central invariant.
+
+**Acceptance criteria:**
+- [ ] Runs the one frozen Checkpoint-E config (and only that config) against the Task 20 baseline's methodology, on test
+- [ ] This is the **first and only** point real paired significance tests apply (exact McNemar, paired bootstrap) — every dev-split number in Task 18/20/21/22 stays effect-size-and-CI only, permanently
+- [ ] Test-split access logged in `notes.md`, per the standing rule ("log every access")
+- [ ] Reports the measured noise floor beside the result, same as Task 22 (temperature 0 isn't deterministic, `decisions/0008`)
+- [ ] Tier 2 (human) or Tier 3 (calibrated judge, κ reported) scoring may be spent here — PLAN Sec 4d reserves both for exactly this pass — but only if a Tier 3 judge has since been calibrated (`decisions/0008` addendum: declined for Task 20; still unbuilt)
+
+**Verification:** `notes.md` shows a single test-split access, dated, naming the frozen config. `RESULTS.md` carries the confirmatory row with a real p-value, the only one in the project.
+
+**Dependencies:** Checkpoint E · **Scope:** S
 
 ---
 

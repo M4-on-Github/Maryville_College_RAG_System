@@ -1,0 +1,7 @@
+{
+  "detail": {
+    "chunks_path": "corpus\\baseline_chunks_no_boilerplate.jsonl"
+  },
+  "digest": "bp_off+fixed512",
+  "kind": "corpus"
+}

@@ -7,7 +7,13 @@ mirrors (docs/phase3b-sanity-review.md, adversarial-10).
 
 from __future__ import annotations
 
-from mcrag.eval.tier0_scoring import extract_cited_urls, looks_like_a_refusal, score_tier0
+from mcrag.eval.tier0_scoring import (
+    extract_cited_urls,
+    extract_citation_markers,
+    looks_like_a_refusal,
+    score_citation_markers,
+    score_tier0,
+)
 
 
 # ---- extract_cited_urls -----------------------------------------------------
@@ -134,3 +140,62 @@ def test_exact_match_presence_is_zero_when_the_entity_is_dropped():
 def test_exact_match_presence_is_none_when_the_question_has_no_detectable_entity():
     result = score_tier0("A generic answer.", "What is the mission statement?", set(), set(), expects_answer=True)
     assert result.exact_match_presence is None
+
+
+# ---- score_citation_markers (Task 22, ablation #8) --------------------------
+
+
+def test_extract_citation_markers_reads_every_bracket():
+    assert extract_citation_markers("The deposit is $300 [2][4].") == [2, 4]
+
+
+def test_extract_citation_markers_on_no_brackets():
+    assert extract_citation_markers("A plain sentence.") == []
+
+
+def test_fully_cited_answer_scores_full_compliance():
+    answer = "The deposit is $300 [1]. It is refundable by May 1st [2]."
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.compliance == 1.0
+    assert result.n_sentences == 2
+    assert result.n_marked == 2
+
+
+def test_partially_cited_answer_scores_the_marked_fraction():
+    answer = "The deposit is $300 [1]. It is refundable by May 1st."
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.compliance == 0.5
+
+
+def test_uncited_free_form_answer_scores_zero_not_none():
+    answer = "The deposit is $300. It is refundable by May 1st."
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.compliance == 0.0
+    assert result.n_sentences == 2
+
+
+def test_a_marker_outside_the_passage_range_is_invalid_but_still_counted_as_an_attempt():
+    answer = "The deposit is $300 [9]."  # only 5 passages exist -- fabricated
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.n_invalid_markers == 1
+    assert result.compliance == 0.0  # no VALID marker on this sentence
+
+
+def test_a_sentence_with_one_valid_and_one_invalid_marker_still_counts_as_marked():
+    answer = "The deposit is $300 [1][9]."
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.n_marked == 1
+    assert result.n_invalid_markers == 1
+
+
+def test_no_substantial_sentences_returns_none_not_zero():
+    result = score_citation_markers("No.", n_passages=5)
+    assert result.compliance is None
+    assert result.n_sentences == 0
+
+
+def test_bare_yes_fragment_is_not_counted_as_a_citable_sentence():
+    answer = "Yes. The library opens at 8am [1]."
+    result = score_citation_markers(answer, n_passages=5)
+    assert result.n_sentences == 1  # "Yes." dropped, too short
+    assert result.compliance == 1.0

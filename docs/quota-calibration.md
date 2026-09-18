@@ -45,9 +45,11 @@ At 2.3s per query (1.8-3.0s), sequentially, one concurrency slot:
 
 **Full gold-set passes per five-hour session window: 25.** That is throughput arithmetic, not an observed ceiling: nothing in this run tested what happens in hour four.
 
-The metered ablation program is 10 arms on the 120-question test split: 1200 queries, 0.8 hours of sequential wall-clock.
+⚠️ **Corrected 2026-09-17 (`decisions/0006` addendum 3):** the line below originally read "10 arms on the 120-question test split," contradicting Task 22's own "dev, never test" criterion and Checkpoint E. Task 22's ~10 arms run on the **60-question dev split**; the 120-question test split is spent exactly once, in Task 22b, on the single frozen winner — not once per arm.
 
-**This is well under what PLAN budgeted for.** PLAN 2a sized the project around 5-15 seconds per query and a 12-40 minute pass; the measurement is 2.3s and 6 minutes for the same 150 questions. The consequence is that quota is not the binding constraint on Phase 4, and the OFAT restriction on the metered half is now a **statistical** decision rather than a budget one: 10 arms spend the test split 10 times, and a factorial design would spend it far more. Re-read that decision at Checkpoint D against the analysis plan, not against this page.
+The metered ablation program is ~10 arms on the 60-question dev split (≈600 queries, ~20 min sequential wall-clock), plus one 120-question confirmatory pass on test (Task 22b): ≈720 queries total, under 0.3 hours.
+
+**This is well under what PLAN budgeted for.** PLAN 2a sized the project around 5-15 seconds per query and a 12-40 minute pass; the measurement is 2.3s and 6 minutes for a 150-question pass. The consequence is that quota is not the binding constraint on Phase 4, and the OFAT restriction on the metered half is now a **statistical** decision rather than a budget one: even ~10 sequential dev-split arms is not free of drift risk, and a factorial design would spend far more. Re-read that decision at Checkpoint D against the analysis plan, not against this page.
 
 **83% of generated tokens are reasoning, not answer.** Output cost is dominated by a channel the user never sees, so any latency comparison between arms is mostly a comparison of how much the model thought. Answer length is close to noise inside it.
 
