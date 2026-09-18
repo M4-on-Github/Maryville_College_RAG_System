@@ -1,0 +1,38 @@
+{
+  "all_golds_retrieved@k": {
+    "ci_high": 0.8125,
+    "ci_low": 0.5625,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6875
+  },
+  "mrr": {
+    "ci_high": 0.7427083333333333,
+    "ci_low": 0.5225694444444444,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.634375
+  },
+  "ndcg@k": {
+    "ci_high": 0.7510492257592506,
+    "ci_low": 0.5426787949925438,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.6494494887444526
+  },
+  "recall@k": {
+    "ci_high": 0.8645833333333334,
+    "ci_low": 0.6666666666666666,
+    "n": 48,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.7708333333333334
+  },
+  "run": {
+    "n_scored": "48",
+    "n_skipped": "12"
+  }
+}

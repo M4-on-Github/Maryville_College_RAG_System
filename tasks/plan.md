@@ -921,23 +921,23 @@ to a new task, **T22b**, after Checkpoint E. `docs/quota-calibration.md`'s
 "10 arms on the 120-question test split" framing is superseded by that addendum.
 
 **Acceptance criteria:**
-- [x] Citation-forced vs free-form prompting, chosen-τ-gate vs always-answer, model comparison — **done, `decisions/0010`**. **Query reformulation ladder (#6) not yet built** — scoped separately, task stays open until it lands
+- [x] Citation-forced vs free-form prompting, chosen-τ-gate vs always-answer, model comparison — **done, `decisions/0010`**. **Query reformulation ladder (#6) — done, `decisions/0011`**: rungs 1-2 (free) both fail to clear the pre-registered bar; rungs 3-7 (metered) not built, per the pre-registered stopping rule
 - [x] All run on **dev**, never test (now unambiguous — see above)
 - [x] **Runs interleaved by question, never by config** — `mcrag.eval.ablation_runner.run_interleaved`, confirmed live during the real sweep (record counts grew roughly together across all 6 arms)
 - [x] `model.lock` digest re-checked mid-sweep; a change quarantines affected questions rather than the whole run — built as a per-arm `expected_model` dict (a single global value would have wrongly flagged every #10 arm, which deliberately mixes models); zero quarantines in the real run
 - [x] OFAT here is a **quota decision, recorded as such** in `decisions/` — `decisions/0010`
-- [x] Quality **and** cost logged per run (`wall_s`, `completion_tokens`, `reasoning_char_share` per question) — Pareto-frontier presentation still pending (needs #6 too, to be worth plotting)
-- [x] Quota consumption tracked against the Task 3 budget — 360 calls, 22.6 min, well under budget
-- [x] **Every comparison reports the measured noise floor beside its effect** — a fresh, same-session null arm (`free_form_20b_b` vs `_a`), not Task 20's older one
+- [x] Quality **and** cost logged per run (`wall_s`, `completion_tokens`, `reasoning_char_share` per question) — Pareto-frontier presentation still pending, now unblocked (#6 landed with no config change to plot against the control)
+- [x] Quota consumption tracked against the Task 3 budget — 360 calls, 22.6 min, well under budget; #6 spent **zero** quota (rungs 1-2 are free, and the ladder stopped before reaching any metered rung)
+- [x] **Every comparison reports the measured noise floor beside its effect** — a fresh, same-session null arm (`free_form_20b_b` vs `_a`), not Task 20's older one; #6's rungs 1-2 needed no separate noise floor (deterministic, no rerun variance — `decisions/0011`)
 - [x] **Tier 1 faithfulness reported only as a paired arm difference, labelled unvalidated**, answered questions only
 - [x] Noise and reproducibility checks **never go through Task 17's generation cache** — this driver never constructs one
-- [ ] Reformulation step 5 (de-contextualization) is compared against the Task 20 control — waits on #6
+- [x] Reformulation step 5 (de-contextualization) is compared against the Task 20 control — **moot**: the ladder never reaches step 5; rungs 1-2 already failed to clear the bar (`decisions/0011`)
 - [x] #9 evaluates the gate Task 21 adopted against always-answer, in-sample — **found a real tension, not a simple verdict**: Tier 0's coarse `refusal_correct` drops sharply (−0.400) under the gate, while the gate's own stricter precision improves as designed (0.567→0.938); both are correct, they measure different things (`decisions/0010`)
-- [x] Every comparison is selection, not inference (effect size + CI only) — the single-winning-config write-up for Checkpoint E is still open, pending #6 and a human decision on which findings to act on
+- [x] Every comparison is selection, not inference (effect size + CI only) — the single-winning-config write-up for Checkpoint E: **kept config is decisions/0007's frozen retrieval config, unchanged — no reformulation, gemma4:31b generation** (`decisions/0010`, `decisions/0011`)
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
-— Work-queue ordering has a dedicated test (`test_build_work_queue_never_repeats_a_config_consecutively`) plus 24 more covering resumability and drift quarantine. `RESULTS.md`/Pareto frontier not yet generated — waiting on #6.
+— Work-queue ordering has a dedicated test (`test_build_work_queue_never_repeats_a_config_consecutively`) plus 24 more covering resumability and drift quarantine. `RESULTS.md`/Pareto frontier generation still pending — no longer blocked on #6 (which changed nothing to plot), just not yet run.
 
 **Dependencies:** T20, T21 · **Scope:** L
 
@@ -972,9 +972,19 @@ on `gemma4:31b` (180s default, never calibrated against a model other than
   prediction that abstention/cross-silo slices would separate models) is
   **underpowered at n=3–16 per cell** and reported as exploratory only —
   neither confirms nor refutes the prediction.
+- **#6, the reformulation ladder (`decisions/0011`):** rung 1 (acronym
+  dictionary) does not clear its pre-registered bar — 0.708 → 0.688
+  `all_golds_retrieved@5`, −0.021 [−0.063, +0.000], CI does not exclude zero
+  and the point estimate is negative. Per the pre-registered stopping rule,
+  the ladder stops there: rung 2 (dictionary + spelling) was never run, and
+  rungs 3-7 (decomposition, multi-query, de-contextualization, step-back,
+  HyDE — all metered) were never built. Zero quota spent. The finding itself
+  is the answer this ablation was scoped to produce: reformulation does not
+  help this corpus at the frozen retrieval config, so the config stays
+  exactly as `decisions/0007` froze it.
 
 ### ✅ Checkpoint E — before touching test
-- [ ] Full config frozen — the single winning configuration Task 22 selected on dev
+- [x] Full config frozen — the single winning configuration Task 22 selected on dev is `decisions/0007`'s retrieval config unchanged (`decisions/0011` found no reformulation rung worth keeping) with `gemma4:31b` generation (`decisions/0010`)
 - [ ] Every ablation logged and reproducible
 - [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
 

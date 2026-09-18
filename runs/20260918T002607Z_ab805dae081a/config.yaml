@@ -1,0 +1,29 @@
+arm: rung0_identity
+chunk:
+  embedder_token_limit: 512
+  max_tokens: 512
+  overlap_ratio: 0.15
+crawl: null
+eval:
+  gold_path: data\gold\gold_v1.jsonl
+  scorers: []
+  split: dev
+  tau: null
+generation:
+  base_url: https://ollama.com/v1
+  generator: null
+  max_tokens: 1024
+  model: gpt-oss:20b-cloud
+  num_ctx: 8192
+  temperature: 0.0
+name: t22-reformulation-ladder
+notes: 'Task 22 #6 rung 0: reformulator=identity.'
+retrieval:
+  candidate_k: 20
+  fuser: null
+  k: 5
+  legs: []
+  reformulator: null
+  reranker: null
+  silo_boost: 0.0
+seed: 42

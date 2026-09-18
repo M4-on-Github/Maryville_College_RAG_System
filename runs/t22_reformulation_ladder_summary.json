@@ -1,0 +1,29 @@
+{
+  "headline_k": 5,
+  "best_rung": 0,
+  "ladder": [
+    {
+      "rung": 0,
+      "arm": "rung0_identity",
+      "all_golds_retrieved@k": 0.7083333333333334,
+      "vs_best_so_far": null,
+      "kept": true
+    },
+    {
+      "label": "rung1_acronym_dict",
+      "n_paired": 48,
+      "b_minus_a": {
+        "value": -0.02083333333333337,
+        "ci_low": -0.0625,
+        "ci_high": 0.0,
+        "n": 48,
+        "statistic": "mean",
+        "seed": 42
+      },
+      "kept": false,
+      "rung": 1,
+      "arm": "rung1_acronym_dict",
+      "all_golds_retrieved@k": 0.6875
+    }
+  ]
+}
