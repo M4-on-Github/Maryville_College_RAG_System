@@ -933,7 +933,7 @@ to a new task, **T22b**, after Checkpoint E. `docs/quota-calibration.md`'s
 - [x] Noise and reproducibility checks **never go through Task 17's generation cache** — this driver never constructs one
 - [x] Reformulation step 5 (de-contextualization) is compared against the Task 20 control — **moot**: the ladder never reaches step 5; rungs 1-2 already failed to clear the bar (`decisions/0011`)
 - [x] #9 evaluates the gate Task 21 adopted against always-answer, in-sample — **found a real tension, not a simple verdict**: Tier 0's coarse `refusal_correct` drops sharply (−0.400) under the gate, while the gate's own stricter precision improves as designed (0.567→0.938); both are correct, they measure different things (`decisions/0010`)
-- [x] Every comparison is selection, not inference (effect size + CI only) — the single-winning-config write-up for Checkpoint E: **kept config is decisions/0007's frozen retrieval config, unchanged — no reformulation, gemma4:31b generation** (`decisions/0010`, `decisions/0011`)
+- [x] Every comparison is selection, not inference (effect size + CI only) — retrieval side of the write-up is settled: `decisions/0007`'s frozen config, unchanged, no reformulation kept (`decisions/0011`). Generation-model choice is `decisions/0010`'s **still-open** decision (gpt-oss:20b remains "current baseline"; gemma4:31b is a reported recommendation, not yet adopted) — Checkpoint E is where that gets decided
 
 **Verification:** `RESULTS.md` shows quality/cost frontier; no test-split access
 recorded; work-queue order test confirms no two consecutive items share a config.
@@ -984,7 +984,7 @@ on `gemma4:31b` (180s default, never calibrated against a model other than
   exactly as `decisions/0007` froze it.
 
 ### ✅ Checkpoint E — before touching test
-- [x] Full config frozen — the single winning configuration Task 22 selected on dev is `decisions/0007`'s retrieval config unchanged (`decisions/0011` found no reformulation rung worth keeping) with `gemma4:31b` generation (`decisions/0010`)
+- [ ] Full config frozen — retrieval side settled (`decisions/0007` unchanged, `decisions/0011` found no reformulation rung worth keeping); generation-model choice still open — `decisions/0010` reports gemma4:31b matches gpt-oss:20b's faithfulness at far lower cost/latency but explicitly defers the adoption decision to this checkpoint
 - [ ] Every ablation logged and reproducible
 - [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
 
