@@ -1,0 +1,302 @@
+[
+  {
+    "item_id": "cal-001",
+    "model": "gpt-oss:20b",
+    "query_id": "pilot-ss-10",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-002",
+    "model": "gemma4:31b",
+    "query_id": "ss-74",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-003",
+    "model": "gemma4:31b",
+    "query_id": "exact-03",
+    "slice": "exact_match"
+  },
+  {
+    "item_id": "cal-004",
+    "model": "gemma4:31b",
+    "query_id": "ss-72",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-005",
+    "model": "gemma4:31b",
+    "query_id": "cs-28",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-006",
+    "model": "gpt-oss:20b",
+    "query_id": "exact-16",
+    "slice": "exact_match"
+  },
+  {
+    "item_id": "cal-007",
+    "model": "gpt-oss:20b",
+    "query_id": "mt-09",
+    "slice": "multi_turn"
+  },
+  {
+    "item_id": "cal-008",
+    "model": "gpt-oss:20b",
+    "query_id": "temporal-13",
+    "slice": "temporal"
+  },
+  {
+    "item_id": "cal-009",
+    "model": "gemma4:31b",
+    "query_id": "cs-26",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-010",
+    "model": "gpt-oss:20b",
+    "query_id": "ss-46",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-011",
+    "model": "gpt-oss:20b",
+    "query_id": "adversarial-10",
+    "slice": "adversarial"
+  },
+  {
+    "item_id": "cal-012",
+    "model": "gemma4:31b",
+    "query_id": "oos-35",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-013",
+    "model": "gemma4:31b",
+    "query_id": "adversarial-10",
+    "slice": "adversarial"
+  },
+  {
+    "item_id": "cal-014",
+    "model": "gpt-oss:20b",
+    "query_id": "cs-14",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-015",
+    "model": "gpt-oss:20b",
+    "query_id": "pilot-cs-06",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-016",
+    "model": "gpt-oss:20b",
+    "query_id": "temporal-09",
+    "slice": "temporal"
+  },
+  {
+    "item_id": "cal-017",
+    "model": "gemma4:31b",
+    "query_id": "ss-17",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-018",
+    "model": "gemma4:31b",
+    "query_id": "temporal-04",
+    "slice": "temporal"
+  },
+  {
+    "item_id": "cal-019",
+    "model": "gpt-oss:20b",
+    "query_id": "ss-76",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-020",
+    "model": "gemma4:31b",
+    "query_id": "cs-63",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-021",
+    "model": "gpt-oss:20b",
+    "query_id": "ss-23",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-022",
+    "model": "gpt-oss:20b",
+    "query_id": "pilot-oos-06",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-023",
+    "model": "gpt-oss:20b",
+    "query_id": "ss-27",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-024",
+    "model": "gemma4:31b",
+    "query_id": "mt-08",
+    "slice": "multi_turn"
+  },
+  {
+    "item_id": "cal-025",
+    "model": "gemma4:31b",
+    "query_id": "ss-69",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-026",
+    "model": "gpt-oss:20b",
+    "query_id": "ss-30",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-027",
+    "model": "gemma4:31b",
+    "query_id": "exact-20",
+    "slice": "exact_match"
+  },
+  {
+    "item_id": "cal-028",
+    "model": "gpt-oss:20b",
+    "query_id": "oos-27",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-029",
+    "model": "gemma4:31b",
+    "query_id": "ss-39",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-030",
+    "model": "gemma4:31b",
+    "query_id": "temporal-10",
+    "slice": "temporal"
+  },
+  {
+    "item_id": "cal-031",
+    "model": "gpt-oss:20b",
+    "query_id": "mt-07",
+    "slice": "multi_turn"
+  },
+  {
+    "item_id": "cal-032",
+    "model": "gpt-oss:20b",
+    "query_id": "adversarial-24",
+    "slice": "adversarial"
+  },
+  {
+    "item_id": "cal-033",
+    "model": "gpt-oss:20b",
+    "query_id": "exact-04",
+    "slice": "exact_match"
+  },
+  {
+    "item_id": "cal-034",
+    "model": "gpt-oss:20b",
+    "query_id": "oos-57",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-035",
+    "model": "gemma4:31b",
+    "query_id": "ss-76",
+    "slice": "single_silo"
+  },
+  {
+    "item_id": "cal-036",
+    "model": "gemma4:31b",
+    "query_id": "oos-36",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-037",
+    "model": "gpt-oss:20b",
+    "query_id": "adversarial-12",
+    "slice": "adversarial"
+  },
+  {
+    "item_id": "cal-038",
+    "model": "gemma4:31b",
+    "query_id": "oos-34",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-039",
+    "model": "gpt-oss:20b",
+    "query_id": "pilot-cs-01",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-040",
+    "model": "gpt-oss:20b",
+    "query_id": "cs-28",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-041",
+    "model": "gemma4:31b",
+    "query_id": "cs-25",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-042",
+    "model": "gemma4:31b",
+    "query_id": "adversarial-25",
+    "slice": "adversarial"
+  },
+  {
+    "item_id": "cal-043",
+    "model": "gpt-oss:20b",
+    "query_id": "cs-25",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-044",
+    "model": "gemma4:31b",
+    "query_id": "oos-46",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-045",
+    "model": "gemma4:31b",
+    "query_id": "oos-27",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-046",
+    "model": "gemma4:31b",
+    "query_id": "cs-21",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-047",
+    "model": "gpt-oss:20b",
+    "query_id": "cs-70",
+    "slice": "cross_silo"
+  },
+  {
+    "item_id": "cal-048",
+    "model": "gemma4:31b",
+    "query_id": "oos-11",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-049",
+    "model": "gpt-oss:20b",
+    "query_id": "oos-41",
+    "slice": "out_of_scope"
+  },
+  {
+    "item_id": "cal-050",
+    "model": "gemma4:31b",
+    "query_id": "pilot-ss-10",
+    "slice": "single_silo"
+  }
+]
