@@ -1,8 +1,8 @@
 # 0012 — Tier 3 judge calibration (T22b prerequisite)
 
 **Date:** 2026-09-22 · **Status:** calibration run complete. Both Tier 3 and
-the Tier 1 re-check fail their pre-registered gates. Decision on how T22b
-proceeds without a calibrated judge is pending — see bottom.
+the Tier 1 re-check fail their pre-registered gates. Resolved 2026-09-22 —
+see "Resolution" at bottom: option 1, Tier 3 dropped for T22b.
 
 ## Context
 
@@ -136,3 +136,14 @@ non-exclusive options:
 3. **Both** — run T22b now on option 1's scorers, and treat a harder
    recalibration as separate, unblocking work that could upgrade a later
    pass if it succeeds, never re-touching test either way.
+
+## Resolution — 2026-09-22
+
+**Option 1.** T22b runs on Tier 0 (deterministic) + Tier 1 (NLI, primary
+generation metric, labelled unvalidated per `decisions/0008`) + Tier 2
+(human hand-scoring, n≈120, PLAN's own reservation for exactly this final
+pass). No `Tier3JudgeScorer` call is made against test or dev again under
+this doc. `nemotron-3-nano:30b` remains available as a judge in the code
+but uncalibrated (`assert_calibrated` still blocks it) — a harder,
+deliberately-adversarial-weighted recalibration (option 2/3 above) is
+deferred, not abandoned, and does not gate T22b.
