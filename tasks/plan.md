@@ -986,7 +986,7 @@ on `gemma4:31b` (180s default, never calibrated against a model other than
 ### ✅ Checkpoint E — before touching test
 - [x] Full config frozen — `decisions/0007`'s retrieval config, unchanged; `decisions/0011`'s no-reformulation; `decisions/0010`'s generation model switched to **`gemma4:31b`** (human decision, 2026-09-18: faithfulness tied within noise, ~301 fewer completion tokens and ~4.4s faster per question — driven by a 73pp-lower reasoning-channel share, not parameter count; by-slice behavior not validated, n=3–16/cell)
 - [x] Every ablation logged and reproducible — spot-checked every decisions doc's cited numbers against the run dirs/summary JSONs they reference (`decisions/0007`'s tie-break cell, `decisions/0009`'s τ=4.96 row, `decisions/0010`'s #10 headline deltas, `decisions/0011`'s rung comparison): all match on disk. Found and fixed one real gap — `runs/phase4_free_factorial_summary.json`, the file `decisions/0007` cites as its "machine-readable source," was never committed when T18 landed; force-added now
-- [ ] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below
+- [x] **Test split evaluated exactly once, after this checkpoint** — that evaluation is Task 22b, immediately below (done 2026-09-22, `decisions/0013`)
 
 ## Task 22b: Test-split confirmatory pass
 
@@ -998,13 +998,13 @@ dev-side comparisons separately, which would spend test multiple times and
 break the project's central invariant.
 
 **Acceptance criteria:**
-- [ ] Runs the one frozen Checkpoint-E config (and only that config) against the Task 20 baseline's methodology, on test
-- [ ] This is the **first and only** point real paired significance tests apply (exact McNemar, paired bootstrap) — every dev-split number in Task 18/20/21/22 stays effect-size-and-CI only, permanently
-- [ ] Test-split access logged in `notes.md`, per the standing rule ("log every access")
-- [ ] Reports the measured noise floor beside the result, same as Task 22 (temperature 0 isn't deterministic, `decisions/0008`)
-- [ ] Tier 2 (human) or Tier 3 (calibrated judge, κ reported) scoring may be spent here — PLAN Sec 4d reserves both for exactly this pass — but only if a Tier 3 judge has since been calibrated (`decisions/0008` addendum: declined for Task 20; still unbuilt)
+- [x] Runs the one frozen Checkpoint-E config (and only that config) against the Task 20 baseline's methodology, on test — `scripts/run_t22b_test_confirmatory.py`, 3 arms (baseline x2 + frozen), 120 test questions, 360 calls, 0 quarantined
+- [x] This is the **first and only** point real paired significance tests apply (exact McNemar, paired bootstrap) — every dev-split number in Task 18/20/21/22 stays effect-size-and-CI only, permanently — `decisions/0013`'s "primary" comparison is the only `mcnemar_exact` call against test or dev anywhere in the project; `assert_reportable` guards it
+- [x] Test-split access logged in `notes.md`, per the standing rule ("log every access") — `notes.md` (new, repo root), one dated entry
+- [x] Reports the measured noise floor beside the result, same as Task 22 (temperature 0 isn't deterministic, `decisions/0008`) — `decisions/0013` Results, noise floor table (`exact_text_match` 0.158, confirming non-determinism persists)
+- [x] Tier 2 (human) or Tier 3 (calibrated judge, κ reported) scoring may be spent here — PLAN Sec 4d reserves both for exactly this pass — but only if a Tier 3 judge has since been calibrated (`decisions/0008` addendum: declined for Task 20; still unbuilt) — Tier 3 calibration attempted and failed (`decisions/0012`, κ=0.146); full Tier 2 explicitly declined by human decision (`decisions/0013` Resolution) — neither spent, by design, not oversight
 
-**Verification:** `notes.md` shows a single test-split access, dated, naming the frozen config. `RESULTS.md` carries the confirmatory row with a real p-value, the only one in the project.
+**Verification:** `notes.md` shows a single test-split access, dated, naming the frozen config. `decisions/0013` carries the confirmatory result with the project's one real p-value (McNemar, `refusal_correct`, p=0.81; `citation_accuracy`/`citation_validity`, p=1.00 — no accuracy difference distinguishable from chance) alongside a large, noise-floor-exceeding cost/latency win for `gemma4:31b` (−5.5s, −298 completion tokens, −0.755 reasoning-channel share).
 
 **Dependencies:** Checkpoint E · **Scope:** S
 

@@ -1,0 +1,30 @@
+arm: t22b_frozen_gemma4_31b
+chunk:
+  embedder_token_limit: 512
+  max_tokens: 512
+  overlap_ratio: 0.15
+crawl: null
+eval:
+  gold_path: data\gold\gold_v1.jsonl
+  scorers: []
+  split: test
+  tau: null
+generation:
+  base_url: https://ollama.com/v1
+  generator: null
+  max_tokens: 1024
+  model: gemma4:31b
+  num_ctx: 8192
+  temperature: 0.0
+name: t22b-test-confirmatory
+notes: 'Task 22b arm t22b_frozen_gemma4_31b: gemma4:31b, free-form prompt, no abstention
+  gate, frozen retrieval (decisions/0007), full test split. decisions/0013.'
+retrieval:
+  candidate_k: 20
+  fuser: null
+  k: 5
+  legs: []
+  reformulator: null
+  reranker: null
+  silo_boost: 0.0
+seed: 42

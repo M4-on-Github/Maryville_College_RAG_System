@@ -1,0 +1,110 @@
+{
+  "all_golds_retrieved@k": {
+    "ci_high": 0.6875,
+    "ci_low": 0.4895833333333333,
+    "n": 96,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5833333333333334
+  },
+  "citation_accuracy": {
+    "ci_high": 0.7324561403508771,
+    "ci_low": 0.44298245614035087,
+    "n": 38,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5903508771929824
+  },
+  "citation_validity": {
+    "ci_high": 1.0,
+    "ci_low": 0.8859649122807017,
+    "n": 38,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.956140350877193
+  },
+  "completion_tokens": {
+    "ci_high": 413.05,
+    "ci_low": 341.05,
+    "n": 120,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 376.175
+  },
+  "exact_match_presence": {
+    "ci_high": 0.6363636363636364,
+    "ci_low": 0.09090909090909091,
+    "n": 11,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.36363636363636365
+  },
+  "faithfulness": {
+    "ci_high": 0.4938105805530048,
+    "ci_low": 0.33593820601396357,
+    "n": 99,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.41408875916451676
+  },
+  "mrr": {
+    "ci_high": 0.653125,
+    "ci_low": 0.48072916666666665,
+    "n": 96,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5661458333333333
+  },
+  "ndcg@k": {
+    "ci_high": 0.6462905685041096,
+    "ci_low": 0.48385494592821743,
+    "n": 96,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.5638944137586421
+  },
+  "reasoning_char_share": {
+    "ci_high": 0.7817783883995094,
+    "ci_low": 0.7267827138244324,
+    "n": 120,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.7550135359417347
+  },
+  "recall@k": {
+    "ci_high": 0.7447916666666666,
+    "ci_low": 0.5677083333333334,
+    "n": 96,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.65625
+  },
+  "refusal_correct": {
+    "ci_high": 0.875,
+    "ci_low": 0.7333333333333333,
+    "n": 120,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.8083333333333333
+  },
+  "refusal_rate": {
+    "ci_high": 0.225,
+    "ci_low": 0.09166666666666666,
+    "n": 120,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 0.15833333333333333
+  },
+  "run": {
+    "n_quarantined": "0",
+    "n_total": "120"
+  },
+  "wall_s": {
+    "ci_high": 7.092890180823937,
+    "ci_low": 5.884292469991488,
+    "n": 120,
+    "seed": 42,
+    "statistic": "mean",
+    "value": 6.470522228329598
+  }
+}
