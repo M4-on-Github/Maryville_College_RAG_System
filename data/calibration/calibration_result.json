@@ -1,0 +1,61 @@
+{
+  "judge_model": "nemotron-3-nano:30b",
+  "n_items": 50,
+  "n_judged": 50,
+  "n_unparseable": 0,
+  "kappa": {
+    "value": 0.14634146341463367,
+    "ci_low": -0.11336032388663955,
+    "ci_high": 0.5398773006134964,
+    "n": 50,
+    "floor": 0.6
+  },
+  "passes_gate": false,
+  "exact_agreement": 0.86,
+  "human_label_counts": {
+    "2": 45,
+    "1": 5
+  },
+  "judge_label_counts": {
+    "2": 46,
+    "1": 4
+  },
+  "confusion": {
+    "human0_judge0": 0,
+    "human0_judge1": 0,
+    "human0_judge2": 0,
+    "human1_judge0": 0,
+    "human1_judge1": 1,
+    "human1_judge2": 4,
+    "human2_judge0": 0,
+    "human2_judge1": 3,
+    "human2_judge2": 42
+  },
+  "by_generator": {
+    "gemma4:31b": {
+      "n": 25,
+      "exact_agreement": 0.88,
+      "mean_human": 1.88,
+      "mean_judge": 1.92
+    },
+    "gpt-oss:20b": {
+      "n": 25,
+      "exact_agreement": 0.84,
+      "mean_human": 1.92,
+      "mean_judge": 1.92
+    }
+  },
+  "nli": {
+    "n": 40,
+    "spearman_vs_human": {
+      "value": 0.030330163159655938,
+      "ci_low": -0.2476128909061779,
+      "ci_high": 0.2996377083741319
+    },
+    "mean_nli_by_human_score": {
+      "0": 0.0,
+      "1": 0.42000000000000004,
+      "2": 0.4788208616780046
+    }
+  }
+}
