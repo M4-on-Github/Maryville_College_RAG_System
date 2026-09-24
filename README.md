@@ -105,17 +105,16 @@ spelled out in `tasks/plan.md`.
 
 ```bash
 python -m venv .venv && .venv/Scripts/activate   # Windows; use .venv/bin/activate elsewhere
-pip install -e ".[dev]"
+pip install -e ".[dev,service]"   # the API tests need the service extra
 pytest
 ```
 
 Generation runs against Ollama Cloud's free tier. Copy `.env.example` to `.env`
 and fill in the key; embedding and reranking run locally and need no key.
 
-To serve the API (`POST /ask`, `GET /health`) install the extra and run it:
+To serve the API (`POST /ask`, `GET /health`), run:
 
 ```bash
-pip install -e ".[service]"
 uvicorn mcrag.service.api:app
 ```
 
