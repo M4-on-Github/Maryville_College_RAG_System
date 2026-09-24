@@ -27,6 +27,62 @@ Three lines, and they are enforced in code rather than promised in a document:
 Every URL the crawler *considers* gets a manifest record, fetched or not. A
 corpus that records only its successes cannot tell you what is missing from it.
 
+## Architecture
+
+Two paths that share one corpus: an **offline ingest** path run occasionally, and
+an **online query** path run per question. Every box below is a class behind an
+interface in `mcrag/interfaces.py`, named by config, so an ablation arm is a
+config value rather than an edited function.
+
+```mermaid
+flowchart LR
+  subgraph OFFLINE["Offline ingest (scripts/, run occasionally)"]
+    direction LR
+    S[sitemaps + robots.txt] --> C[Crawl<br/>1 req/s, robots-checked]
+    C --> M[(corpus/manifest.jsonl<br/>every URL considered)]
+    C --> E[Extract<br/>trafilatura, boilerplate off]
+    E --> K[Chunk<br/>fixed 512 tokens]
+    K --> X[(Indexes<br/>BGE dense + BM25 + literal)]
+    K --> G[(Silo / office map<br/>data/offices.yaml)]
+  end
+  subgraph ONLINE["Online query (mcrag/service, per question)"]
+    direction LR
+    Q[Question + prior user turns] --> R[Reformulate<br/>history concatenation]
+    R --> F[Retrieve: dense + BM25 + literal<br/>fused by RRF, top 5 of 20]
+    F --> GEN[Generate<br/>Ollama Cloud, streamed]
+    F -. sources event first .-> OUT
+    GEN --> OUT[SSE stream:<br/>sources, token, citation,<br/>refusal, done]
+    GEN -->|cannot answer| REF[Refusal routed to a<br/>real office + contact]
+    REF --> OUT
+  end
+  X --> F
+  G --> REF
+```
+
+Retrieval runs on the rewritten query, but the answer is generated against the
+original question (`decisions/0015`). The service keeps no
+conversation state; the client sends prior user turns with each request. The wire
+format is specified in `docs/stream_contract.md`, and `clients/reference_client.html`
+is a disposable client proving that document is enough to build one from.
+
+## Corpus coverage
+
+Counted from `corpus/manifest.jsonl` (regenerate with
+`python scripts/coverage.py --markdown`; full breakdown in `docs/coverage.md`).
+**5,479 URLs were considered** and each has a manifest record:
+
+| Status | URLs | Share |
+|---|---:|---:|
+| fetched | 1,847 | 33.7% |
+| excluded | 3,421 | 62.4% |
+| failed | 211 | 3.9% |
+
+Exclusions are `policy` 1,879 (34.3%), `robots_disallow` 1,146 (20.9%) and
+`extraction_empty` 396 (7.2%); failures are `http_error` 211 (3.9%). The
+roughly two-thirds not fetched is the corpus's stated limit: a question whose
+answer lives on an excluded page cannot be answered, and the system is meant to
+refuse rather than guess.
+
 ## Documents
 
 | File | What it is |
@@ -48,7 +104,7 @@ spelled out in `tasks/plan.md`.
 ## Setup
 
 ```bash
-python -m venv .venv && .venv/Scripts/activate   # Windows
+python -m venv .venv && .venv/Scripts/activate   # Windows; use .venv/bin/activate elsewhere
 pip install -e ".[dev]"
 pytest
 ```
@@ -56,6 +112,27 @@ pytest
 Generation runs against Ollama Cloud's free tier. Copy `.env.example` to `.env`
 and fill in the key; embedding and reranking run locally and need no key.
 
+To serve the API (`POST /ask`, `GET /health`) install the extra and run it:
+
+```bash
+pip install -e ".[service]"
+uvicorn mcrag.service.api:app
+```
+
+To try the reference client with no key and no generation quota, run
+`python scripts/serve_reference_client_demo.py` and open the URL it prints. It
+fakes generation only; everything below the transport is real.
+
+## Results
+
+`RESULTS.md` is regenerated from `runs/` by `python scripts/generate_results.py`
+(never hand-edited): every run with its split, n, quality and median cost, the
+3a/3c baselines marked as controls, and a quality/cost Pareto frontier. The
+ablation table, not the demo, is the centerpiece.
+
 ## Status
 
-Phase 0 (foundations) is in progress. No corpus has been crawled yet.
+Backend complete through Checkpoint F. Not yet done: the limitations write-up
+(T32), the recorded demo (T33), and live-quota checks of the streaming timing
+claim, prompt-injection refusals and a real-browser pass on the reference client,
+which are recorded as open in `tasks/plan.md` rather than claimed.

@@ -6,8 +6,8 @@
 
 | | count | share |
 |---|---:|---:|
-| excluded | 3411 | 62.3% |
-| fetched | 1857 | 33.9% |
+| excluded | 3421 | 62.4% |
+| fetched | 1847 | 33.7% |
 | failed | 211 | 3.9% |
 | **total** | **5479** | |
 
@@ -17,7 +17,7 @@
 |---|---:|---:|
 | policy | 1879 | 34.3% |
 | robots_disallow | 1146 | 20.9% |
-| extraction_empty | 386 | 7.0% |
+| extraction_empty | 396 | 7.2% |
 | http_error | 211 | 3.9% |
 | **total** | **5479** | |
 
@@ -75,7 +75,7 @@
 | Disallow: /news/smart_catalog_prog/* | 138 | 2.5% |
 | **total** | **5479** | |
 
-Fetched: 1857; redirected: 155
-Extracted chars -- median 681, min 202, max 74339
+Fetched: 1847; redirected: 155
+Extracted chars -- median 715, min 202, max 74339
 
 Pending fetch: 0
