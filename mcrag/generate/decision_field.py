@@ -42,3 +42,25 @@ def parse_decision(text: str) -> tuple[str | None, str]:
 def strip_decision_line(text: str) -> str:
     """`parse_decision(text)[1]`, for callers that only want the scoreable text."""
     return parse_decision(text)[1]
+
+
+# T41b (decisions/0018): the same field, moved to the end. Anchored at `\Z` so only a
+# genuinely trailing line counts -- a `DECISION:` line with prose after it is a
+# violation, as strict as the prefix form, so the two arms stay comparable.
+_TRAILING_DECISION_LINE = re.compile(
+    r"(?:\A|\r?\n)[ \t]*DECISION:[ \t]*(ANSWER|ABSTAIN)[ \t]*\r?\n?[ \t\r\n]*\Z", re.I
+)
+
+
+def parse_trailing_decision(text: str) -> tuple[str | None, str]:
+    """`(decision, text_without_the_trailing_line)`.
+
+    The suffix counterpart of `parse_decision`. `None` when the last line is missing or
+    malformed, and the text comes back unchanged. Trailing whitespace left behind by
+    removing the line is stripped, so scoring sees the answer as the model would have
+    written it without the protocol.
+    """
+    match = _TRAILING_DECISION_LINE.search(text)
+    if match is None:
+        return None, text
+    return match.group(1).upper(), text[: match.start()].rstrip()

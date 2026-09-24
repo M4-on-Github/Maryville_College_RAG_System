@@ -120,6 +120,23 @@ DECISION_FIELD_SYSTEM_PROMPT = (
     "source URL of every passage you use. Never omit the first line."
 )
 
+# Task 41b (decisions/0018): the same field at the END of the reply. T41's prefix form
+# was rejected because committing to ABSTAIN on line one stopped the model writing the
+# partial answer the adopted prompt gives; here it writes first and labels what it
+# wrote. The "partial answer counts as ANSWER" clause is deliberate -- it resolves the
+# one T41 case whose ABSTAIN label sat over a body that did answer.
+SUFFIX_DECISION_FIELD_SYSTEM_PROMPT = (
+    SCOPE_STRICT_SYSTEM_PROMPT
+    + " Write your reply first, in full, exactly as described above. Then close it "
+    "with a decision line: the very last line of your reply must be exactly "
+    "`DECISION: ANSWER` or exactly `DECISION: ABSTAIN`, on its own line, with "
+    "nothing after it. Write `DECISION: ABSTAIN` only when the reply you just "
+    "wrote does not answer the question because the passages do not address it. If "
+    "your reply answers the question even partly -- including when you answer what "
+    "the passages do cover and then note what they do not -- write `DECISION: "
+    "ANSWER`. Never omit the last line."
+)
+
 # Task 24 (PLAN Phase 5, tasks/plan.md T24): SCOPE_STRICT_SYSTEM_PROMPT above
 # already treats <passages> as untrusted data (T16, decisions/0005) -- that
 # defends against a scraped page shaped like an instruction. The answer

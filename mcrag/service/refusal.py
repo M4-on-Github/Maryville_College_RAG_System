@@ -10,7 +10,7 @@ import re
 from typing import Protocol
 
 from mcrag.eval.tier0_scoring import extract_cited_urls, looks_like_a_refusal
-from mcrag.generate.decision_field import ABSTAIN, parse_decision
+from mcrag.generate.decision_field import ABSTAIN, parse_decision, parse_trailing_decision
 
 
 class RefusalClassifier(Protocol):
@@ -88,6 +88,22 @@ class DecisionFieldClassifier:
 
     def is_refusal(self, answer: str) -> bool:
         decision, _rest = parse_decision(answer)
+        if decision is None:
+            return self._fallback.is_refusal(answer)
+        return decision == ABSTAIN
+
+
+class SuffixDecisionFieldClassifier:
+    """T41b (decisions/0018): reads a *trailing* `DECISION:` line. Same fallback
+    contract as `DecisionFieldClassifier` -- a protocol violation must not silently
+    become "did not refuse". Only correct with `SUFFIX_DECISION_FIELD_SYSTEM_PROMPT`.
+    """
+
+    def __init__(self, fallback: RefusalClassifier | None = None) -> None:
+        self._fallback = fallback if fallback is not None else NarrowPhraseClassifier()
+
+    def is_refusal(self, answer: str) -> bool:
+        decision, _rest = parse_trailing_decision(answer)
         if decision is None:
             return self._fallback.is_refusal(answer)
         return decision == ABSTAIN
