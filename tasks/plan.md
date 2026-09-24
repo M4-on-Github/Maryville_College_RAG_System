@@ -1226,7 +1226,7 @@ decided it is a new client against a frozen contract.
 ### ✅ Checkpoint F — backend complete
 - [x] Contract frozen and documented; a second client could be written from the doc alone (T29 client built against the doc; found the `EventSource`/`X-API-Key` gap)
 - [x] Service callable runs with no server (`tests/test_service.py`)
-- [ ] Sources-before-tokens verified by timing test — **OPEN, deliberately not run (2026-09-24).** Ordering is a design property and is tested, but the "sources arrives >=1s before first token" claim needs a live `gemma4:31b` call, which spends generation quota. Waived for now by the user; no timing claim may be made until a real run is reported. The live injection-refusal run (T24), live `curl -N POST /ask` (T25) and a real-browser open of the client (T29) are open for the same reason.
+- [ ] Sources-before-tokens verified by timing test — **OPEN, deliberately not run (2026-09-24).** Ordering is a design property and is tested, but the "sources arrives >=1s before first token" claim needs a live `gemma4:31b` call, which spends generation quota. Waived for now by the user; no timing claim may be made until a real run is reported. The live injection-refusal run (T24), live `curl -N POST /ask` (T25) are open for the same reason. The real-browser open of the client (T29) was done 2026-09-24 against the zero-quota demo server only: sources with `stale` badge, citation, `rewritten_query` on a follow-up and the refusal block with office contact all rendered; stage timings were stub zeros so the null-stage `—` rendering and real-model streaming remain unchecked.
 - [x] Refusal always routes to a real office (code + tests; live refusal run still open, see above)
 - [x] **No UI decision has been made or needed**
 

@@ -139,5 +139,5 @@ ablation table, not the demo, is the centerpiece.
 ## Status
 
 Backend complete through Checkpoint F. Not yet done: the recorded demo (T33), and live-quota checks of the streaming timing
-claim, prompt-injection refusals and a real-browser pass on the reference client,
-which are recorded as open in `tasks/plan.md` rather than claimed.
+claim and prompt-injection refusals (the reference client had a real-browser pass
+against the zero-quota demo server only), which are recorded as open in `tasks/plan.md` rather than claimed.

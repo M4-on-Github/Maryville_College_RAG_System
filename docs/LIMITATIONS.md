@@ -111,7 +111,12 @@ These are recorded as open in `tasks/plan.md` and not claimed anywhere:
   (Checkpoint F). Ordering is a tested design property; the timing number needs a
   live `gemma4:31b` call.
 - A live run of the three fixed prompt-injection attempts against the real model.
-- A live `curl -N POST /ask` and a real-browser open of the reference client.
+- A live `curl -N POST /ask`.
+- The reference client was opened in a real browser (2026-09-24), but only
+  against the zero-quota demo server: sources, stale badge, citation link,
+  rewritten-query line and refusal block rendered. Its stage timings are stub
+  zeros and its answer is fixed, so this shows the client works, not that the
+  real model streams correctly through it.
 - The setup steps for rebuilding `corpus/` and `indexes/` on a fresh machine.
   The clean-clone check covered install and tests only.
 
