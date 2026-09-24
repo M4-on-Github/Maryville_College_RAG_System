@@ -1224,11 +1224,11 @@ decided it is a new client against a frozen contract.
 **Resolution:** done 2026-09-23. **No product code changed for this task** — `clients/reference_client.html` and `scripts/serve_reference_client_demo.py` are both new files, and nothing under `mcrag/` was touched, which is the strongest available evidence that the contract really is the whole client surface. Two deliberate choices: the client hand-rolls SSE parsing over `fetch` rather than using `EventSource`, because `EventSource` is GET-only and cannot set the `X-API-Key` header T25 requires (worth knowing before a real front end is designed); and the render harness used to verify it was left in the scratchpad rather than committed as a test, because a permanent test suite around a file whose header says *delete me* is exactly the kind of growth the disposability warning exists to prevent. The client holds the conversation itself — prior user turns only, oldest first — matching T28's statelessness rather than inventing a session id the server would ignore.
 
 ### ✅ Checkpoint F — backend complete
-- [ ] Contract frozen and documented; a second client could be written from the doc alone
-- [ ] Service callable runs with no server
-- [ ] Sources-before-tokens verified by timing test
-- [ ] Refusal always routes to a real office
-- [ ] **No UI decision has been made or needed**
+- [x] Contract frozen and documented; a second client could be written from the doc alone (T29 client built against the doc; found the `EventSource`/`X-API-Key` gap)
+- [x] Service callable runs with no server (`tests/test_service.py`)
+- [ ] Sources-before-tokens verified by timing test — **OPEN, deliberately not run (2026-09-24).** Ordering is a design property and is tested, but the "sources arrives >=1s before first token" claim needs a live `gemma4:31b` call, which spends generation quota. Waived for now by the user; no timing claim may be made until a real run is reported. The live injection-refusal run (T24), live `curl -N POST /ask` (T25) and a real-browser open of the client (T29) are open for the same reason.
+- [x] Refusal always routes to a real office (code + tests; live refusal run still open, see above)
+- [x] **No UI decision has been made or needed**
 
 ---
 
@@ -1237,12 +1237,14 @@ decided it is a new client against a frozen contract.
 ## Task 30: Results table generator
 
 **Acceptance criteria:**
-- [ ] `RESULTS.md` regenerated from `runs/` — never hand-edited
-- [ ] Every row carries n, split, and cost alongside quality
-- [ ] Baseline rows (3a / 3b / 3c) marked as controls
-- [ ] Quality/cost Pareto frontier plotted (§4b)
+- [x] `RESULTS.md` regenerated from `runs/` — never hand-edited (`scripts/generate_results.py`)
+- [x] Every row carries n, split, and cost alongside quality (cost = median `wall_s`, PLAN 4f; `--` for retrieval-only runs)
+- [x] Baseline rows marked as controls — 3a and 3c only: there is no 3b run dir (3b was a read-through, not a scored run)
+- [x] Quality/cost Pareto frontier plotted (§4b) — `results_pareto.svg`, hand-written SVG so output is deterministic; dev split only, faithfulness vs median wall time
 
-**Verification:** Delete and regenerate; output is byte-identical.
+**Verification:** Delete and regenerate; output is byte-identical. — done 2026-09-24: sha1 of `RESULTS.md` and `results_pareto.svg` identical across delete/regenerate; also `test_regeneration_is_byte_identical`. 628 tests pass.
+
+**Resolution:** the Pareto frontier is faithfulness-only, so `answerability_gate_gemma4_31b` sits on it despite being rejected in `decisions/0014` (it refuses more: refusal_correct 0.683). The generated text says so rather than letting the plot endorse it. Test-split runs are in the table but deliberately off the frontier.
 
 **Dependencies:** T22 · **Scope:** M
 

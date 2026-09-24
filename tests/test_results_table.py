@@ -116,3 +116,55 @@ def test_write_results_md_appends_the_factorial_section_when_given_a_real_path(t
     md = write_results_md(tmp_path, tmp_path / "RESULTS.md", factorial_summary_path=summary_path)
     assert "dense-only" in md  # the ordinary leaderboard is still there
     assert "Task 18" in md  # and the factorial section is appended after it
+
+
+def _gen_run(root, run_id, arm, split, faith, walls):
+    _make_run(root, run_id, arm, split, 0.7)
+    d = root / run_id
+    m = json.loads((d / "metrics.json").read_text(encoding="utf-8"))
+    m["faithfulness"] = {"value": faith, "ci_low": faith - 0.1, "ci_high": faith + 0.1, "n": 50}
+    (d / "metrics.json").write_text(json.dumps(m), encoding="utf-8")
+    (d / "per_query.jsonl").write_text("\n".join(json.dumps({"wall_s": w}) for w in walls), encoding="utf-8")
+
+
+def test_cost_is_median_not_mean_and_retrieval_only_has_none(tmp_path):
+    from mcrag.eval.results_table import median_wall_s
+
+    _gen_run(tmp_path, "20260101T000000Z_a", "gen", "dev", 0.5, [1.0, 1.0, 100.0])
+    _make_run(tmp_path, "20260101T000001Z_b", "retrieval-only", "dev", 0.7)
+    a, b = collect_runs(tmp_path)
+    assert median_wall_s(a) == 1.0  # a mean would be 34
+    assert median_wall_s(b) is None
+    assert render_markdown([a, b]).count("| -- |") >= 1
+
+
+def test_controls_are_marked_in_role_column(tmp_path):
+    _make_run(tmp_path, "20260101T000000Z_a", "3a-dense-only-naive-chunks", "dev", 0.7)
+    _make_run(tmp_path, "20260101T000001Z_b", "something-else", "dev", 0.7)
+    md = render_markdown(collect_runs(tmp_path))
+    assert "control 3a" in md
+    assert md.count("control") == 1
+
+
+def test_pareto_frontier_excludes_dominated_and_other_splits(tmp_path):
+    from mcrag.eval.results_table import pareto_points
+
+    _gen_run(tmp_path, "20260101T000000Z_a", "cheap-ok", "dev", 0.4, [1.0])
+    _gen_run(tmp_path, "20260101T000001Z_b", "dear-good", "dev", 0.6, [3.0])
+    _gen_run(tmp_path, "20260101T000002Z_c", "dominated", "dev", 0.3, [4.0])
+    _gen_run(tmp_path, "20260101T000003Z_d", "test-run", "test", 0.9, [0.1])
+    pts = {p["run"]["config"]["arm"]: p["frontier"] for p in pareto_points(collect_runs(tmp_path))}
+    assert pts == {"cheap-ok": True, "dear-good": True, "dominated": False}
+
+
+def test_regeneration_is_byte_identical(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    _gen_run(runs, "20260101T000000Z_a", "gen", "dev", 0.5, [1.0, 2.0])
+    out = tmp_path / "RESULTS.md"
+    write_results_md(runs, out)
+    first = (out.read_bytes(), (tmp_path / "results_pareto.svg").read_bytes())
+    out.unlink()
+    (tmp_path / "results_pareto.svg").unlink()
+    write_results_md(runs, out)
+    assert first == (out.read_bytes(), (tmp_path / "results_pareto.svg").read_bytes())

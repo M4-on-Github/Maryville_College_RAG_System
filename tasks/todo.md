@@ -56,7 +56,7 @@ Design rationale lives in `PLAN.md`.
 - [ ] **Checkpoint F** — backend complete, no UI decision made or needed
 
 ## Phase 6 — Portfolio
-- [ ] T30 · Results table generator from `runs/` (M)
+- [x] T30 · Results table generator from `runs/` (M) — cost column (median wall_s), 3a/3c control markers, deterministic SVG Pareto frontier; byte-identical regeneration verified
 - [ ] T31 · Architecture diagram + README (S)
 - [ ] T32 · Limitations + writeup (M)
 - [ ] T33 · Recorded demo walkthrough (S)
