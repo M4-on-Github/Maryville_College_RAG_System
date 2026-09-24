@@ -1010,6 +1010,61 @@ break the project's central invariant.
 
 ---
 
+## Task 22c: Answer-level out-of-scope signal
+
+**Description:** T22b (`decisions/0013`) found 100% of false-answer errors
+on test are `out_of_scope`. `decisions/0009` already tested and rejected a
+retrieval-score gate for this; its own conclusion named answer-level
+signals (self-refusal, NLI, LLM answerability) as the unexplored route.
+This task builds that, dev only, same ladder discipline as `0011`.
+
+**Acceptance criteria:**
+- [x] Zero-quota check: does an answer-level signal already on disk
+  (Tier 1 faithfulness) separate false-answer `out_of_scope` cases from
+  everything else, using every dev generation run already stored —
+  `decisions/0014` rung 0: 68% (34/50) of false-answer `out_of_scope`
+  cases score exactly 0.0 faithfulness vs 26.1% (94/360) of legitimate
+  in-scope answers. Real signal, not clean, diagnostic only.
+- [x] Rung 1: a strengthened refusal instruction (prompt-only, no new
+  component), 3 dev arms interleaved incl. this-session noise floor —
+  `decisions/0014` rung 1: **kept**. `out_of_scope` false-answer rate
+  0.417→0.250 (n=12, +0.167 [+0.000,+0.417]), zero collateral drop on
+  pooled dev. Does not close the gap alone (25% still false-answered).
+- [x] Rung 2 (conditional): calibrated post-hoc faithfulness override,
+  fit train/dev like `0009`'s τ — `decisions/0014` rung 2: **not kept**.
+  5-fold CV finds no middle ground between a no-op (80% floor) and fully
+  closing the gap at an unacceptable −0.167 [−0.283,−0.050] pooled
+  refusal_correct collateral cost (95% floor) — same failure shape as the
+  rejected CE gate, smaller scale. `scope_strict_gemma4_31b` (rung 1)
+  alone remains best-so-far.
+- [x] Rung 3: dedicated LLM answerability self-check (two-step pipeline,
+  self-check call before generation, fails closed on an unparseable
+  response) — `decisions/0014` rung 3: **not kept**. Fully closes the
+  `out_of_scope` gap (12/12 refused, false-answer rate 0.000, refusal_correct
+  +0.250 [+0.000,+0.500] n=12) but at the worst pooled collateral cost of
+  any rung tried: refusal_correct −0.217 [−0.350,−0.083] (n=60), well
+  outside the −0.017 noise floor and larger than rung 2's own rejected
+  −0.167. `scope_strict_gemma4_31b` (rung 1) alone remains adopted.
+- [x] Every rung's result — kept or not — recorded in `decisions/0014`
+  before the next rung runs, same "log every arm, not just the winner"
+  rule as `0007`/`0011`. **Ladder closed** — no rung 4 planned.
+
+**Verification:** `decisions/0014` carries the pre-registered design for
+every rung before it runs, and the result immediately after, with the
+noise floor reported beside each effect. Target metric is `out_of_scope`
+false-answer rate; a rung that "fixes" it by refusing everything is not a
+win (`refusal_correct`/faithfulness/citation metrics checked for
+collateral damage every time).
+
+**Dependencies:** Checkpoint E, T22b · **Scope:** M · **Resolution:**
+adopted config for production is `scope_strict_gemma4_31b` (rung 1's
+prompt), un-stacked. The residual `out_of_scope` false-answer rate (25%,
+3/12 dev) is an accepted, documented limitation — every stacked
+answer-level mechanism tried (rungs 2 and 3) traded it for unacceptable
+in-scope false-refusal collateral instead.
+
+---
+
 ---
 
 # Phase 5 — Product backend (UI deliberately deferred)
@@ -1025,15 +1080,26 @@ now, expensive to retrofit. See PLAN.md §Phase 5 for the contract.
 turns it into a public interface the moment it exists.
 
 **Acceptance criteria:**
-- [ ] `docs/stream_contract.md` defines events `sources` · `token` · `citation` · `refusal` · `done` with full field lists
-- [ ] Schema is versioned (`v1`) and the version travels in the `done` event
-- [ ] `citation` carries character spans into the answer text, so clients never re-parse prose
-- [ ] `refusal` carries office, contact URL and email as **structured fields** — no client parses an apology to find an email
-- [ ] Pydantic models generated from / matching the doc, one source of truth
+- [x] `docs/stream_contract.md` defines events `sources` · `token` · `citation` · `refusal` · `done` with full field lists
+- [x] Schema is versioned (`v1`) and the version travels in the `done` event (`DoneEvent.schema_version`)
+- [x] `citation` carries character spans into the answer text, so clients never re-parse prose (`CitationEvent.claim_span`)
+- [x] `refusal` carries office, contact URL and email as **structured fields** — no client parses an apology to find an email (`RefusalEvent`; `reason` reuses `per_query.jsonl`'s existing `threshold`/`gate`/`model` vocabulary rather than inventing a new one)
+- [x] Pydantic models generated from / matching the doc, one source of truth — `mcrag/service/events.py`, `extra="forbid"` on every model
 
-**Verification:** Round-trip every event type through the models; doc and models diff clean in CI.
+**Verification:** `tests/test_stream_contract.py` (12 tests: 5 parametrized round-trips + 7 others) parses every
+`docs/stream_contract.md` JSON example and round-trips it through the
+matching model; `extra="forbid"` means a field added to one side and not
+documented on the other fails validation immediately rather than
+drifting apart silently — the practical form "doc and models diff clean
+in CI" takes without a codegen step (scope S). Full suite: 557 passed.
 
-**Dependencies:** T22 (config frozen) · **Scope:** S
+**Dependencies:** T22 (config frozen) · **Scope:** S · **Resolution:**
+done 2026-09-24. `mcrag/service/` created (Task 24's future home). `pydantic>=2.0`
+added to `pyproject.toml` core dependencies (also needed by Task 25's
+FastAPI shell). The pre-existing `mcrag.types.Event` dataclass is a
+different, lower-level concept — one generation call's own private
+streaming primitive — noted explicitly in the doc so Task 24 doesn't
+conflate the two.
 
 ## Task 24: Answer service callable
 
@@ -1057,34 +1123,38 @@ persona and system-prompt content are decided in *this* module and the
 service layer must not need to change to add the defense later.
 
 **Acceptance criteria:**
-- [ ] Runs the frozen Checkpoint-E config end to end
-- [ ] Retrieved passages reach the prompt whole: `build_user_prompt`'s 1,400-char default cut hid 37% of retrieved text and 9% of retrieved gold passages at the frozen chunk size (`decisions/0008`). Pass `passage_chars=None` and let the context guard refuse real overflow
-- [ ] Yields typed events per T23, in contract order
-- [ ] `import fastapi` does not appear in the module or its imports (asserted by test)
-- [ ] Same code path used by the eval harness, so product and experiment cannot drift
-- [ ] Per-stage latency captured and attached to `done`
-- [ ] System prompt/persona explicitly instructs the model to ignore any
+- [x] Runs the frozen Checkpoint-E config end to end — `mcrag/service/answer.py`, model `gemma4:31b`, retrieval built from the new shared `mcrag/retrieval/frozen_pipeline.py` (extracted from `scripts/run_phase3c_baseline.py` so both use the identical build, not a hand-synced copy)
+- [x] Retrieved passages reach the prompt whole: `build_user_prompt`'s 1,400-char default cut hid 37% of retrieved text and 9% of retrieved gold passages at the frozen chunk size (`decisions/0008`). Pass `passage_chars=None` and let the context guard refuse real overflow — `answer()` calls `build_user_prompt(question, chunks, passage_chars=None)`
+- [x] Yields typed events per T23, in contract order — `sources → refusal → done` or `sources → token*/citation* → done`, verified in `tests/test_service.py`
+- [x] `import fastapi` does not appear in the module or its imports (asserted by test) — `test_no_fastapi_import_in_answer_module_or_its_direct_imports` (AST-based, not a string grep)
+- [x] Same code path used by the eval harness, so product and experiment cannot drift — shared `mcrag.retrieval.frozen_pipeline` module, `scripts/run_phase3c_baseline.py` refactored to import from it too rather than kept as a separate copy
+- [x] Per-stage latency captured and attached to `done` — `embed`/`dense`/`bm25`/`literal`/`fuse` timed individually (embed timed via a documented, deliberately redundant local call: `DenseIndex.search` embeds internally with no seam to inject a precomputed vector), `rerank=None` (off, decisions/0007), `generate_ttft`/`generate_total` from the token stream, `server_ns` from the provider's own `eval_duration`/`prompt_eval_duration` (added as an additive field to `mcrag.generate.ollama_cloud`'s `done` event data)
+- [x] System prompt/persona explicitly instructs the model to ignore any
       user-turn attempt to override its instructions, disclose the system
       prompt, or act outside the RAG/citation contract, and this is covered
       by dedicated test cases (not folded into the false-premise adversarial
-      gold slice, which tests a different failure mode)
+      gold slice, which tests a different failure mode) — `SERVICE_SYSTEM_PROMPT` (`mcrag/generate/prompting.py`, built on the adopted rung 1 `SCOPE_STRICT_SYSTEM_PROMPT`, decisions/0014)
 
-**Verification:** `pytest tests/test_service.py` drives it with no server running. Grep asserts no framework import. A small fixed set of user-turn injection attempts (system-prompt disclosure request, instruction override, role-play jailbreak) is run through the service and asserted to still answer in persona / refuse rather than comply.
+**Verification:** `pytest tests/test_service.py` drives it with no server running (15 tests; every double is a plain Python object duck-typing the real `Generator`/retrieval-leg interfaces, no socket opened, no index read off disk, no quota spent). Grep-equivalent (AST) asserts no framework import. Three fixed user-turn injection attempts (system-prompt disclosure request, instruction override, role-play jailbreak) are run through the service; asserted: the same fixed `SERVICE_SYSTEM_PROMPT` reaches every generation call regardless of the attempt, the user turn always lands inside `<question>` tags, and a refusal-shaped reply is routed as a structured `refusal` event rather than streamed as an answer. Full suite: 572 passed. **What this does not claim:** whether the real `gemma4:31b` model actually refuses these three attempts live is a fact about that model on that text, not this module's code, and isn't something a test double can pin — that is a separate, real-quota report, same convention as every other LLM-behavior claim in this project (e.g. `decisions/0014`), not yet run.
 
 **Dependencies:** T23 · **Scope:** M
+
+**Resolution:** done 2026-09-24. `mcrag/service/answer.py` (`answer()`), `mcrag/retrieval/frozen_pipeline.py` (new, shared retrieval build), `mcrag/generate/prompting.py` (`SERVICE_SYSTEM_PROMPT`), `tests/test_service.py` (new, 15 tests). Refusal routing is deliberately partial: only the `model` pathway is wired (routes to Admissions, `data/offices.yaml`'s generic front door, as an explicit placeholder); the threshold gate (τ = 4.96, decisions/0009), the answerability gate, real per-silo office resolution, and any-signal-wins precedence are T27's job, which this task does not depend on and does not attempt.
 
 ## Task 25: FastAPI + SSE shell
 
 **Acceptance criteria:**
-- [ ] `POST /ask` streams the T24 events as SSE, thin by construction — no logic beyond transport
-- [ ] CORS configurable by origin allowlist
-- [ ] Simple API token check, config-driven
-- [ ] Client disconnect cancels the upstream generation call rather than burning quota to nobody
-- [ ] `GET /health` reports index build id and corpus hash
+- [x] `POST /ask` streams the T24 events as SSE, thin by construction — no logic beyond transport — `mcrag/service/api.py`; `_stream` only pulls from `answer()` and reformats each event via `mcrag.service.events.to_sse`, nothing else
+- [x] CORS configurable by origin allowlist — `Settings.cors_origins` (`mcrag/service/config.py`, `MCRAG_CORS_ORIGINS` env, comma-separated) wired to `CORSMiddleware`
+- [x] Simple API token check, config-driven — `Settings.api_token` (`MCRAG_API_TOKEN` env), `X-API-Key` header, `secrets.compare_digest`; unconfigured fails closed (every request rejected), not open
+- [x] Client disconnect cancels the upstream generation call rather than burning quota to nobody — `_stream` checks `request.is_disconnected()` before every pull; see the granularity caveat below
+- [x] `GET /health` reports index build id and corpus hash — `mcrag/service/health.py`: `index_build_id` hashes the frozen chunk file every retrieval leg is built from, `corpus_hash` reuses T10's `indexes/corpus.lock` `snapshot_hash`
 
-**Verification:** `curl -N` against a live server shows correctly framed events; disconnect test confirms cancellation.
+**Verification:** `tests/test_api.py` (11 tests, `fastapi.testclient.TestClient` against `create_app(settings=..., pipeline=...)` — no real server process, fakes reused from `tests/test_service.py`): auth (missing/wrong/unconfigured token all 401, correct token streams), CORS preflight (allowed origin echoed, unlisted origin gets no CORS header), `/health` reports real fields (also unit-tested against tmp files), a `model` refusal streams `refusal` not `token`, and two tests drive `_stream` directly against a fake `Request.is_disconnected()` (`TestClient`'s in-memory ASGI transport does not reproduce real disconnect timing deterministically) confirming the generator is fully drained to `done` when nothing disconnects and that disconnecting between the `sources` pull and the next pull means `FakeGenerator.generate` is never called at all. Full suite: 583 passed. Live-server smoke test (`uvicorn`, real `/health` against the real frozen chunk file and `indexes/corpus.lock`, real 401s) run manually, zero generation quota spent — confirmed `index_build_id`/`corpus_hash` are real, non-placeholder values and auth rejects over the wire, not just in-process. **What this does not claim:** a live `curl -N POST /ask` against `gemma4:31b` — that would spend real generation quota and has not been run; SSE framing over a real network socket for a real generation call is asserted only via `TestClient`, not via a live process, same convention as every other not-yet-spent real-quota check in this project (e.g. `decisions/0014`, T24). **Cancellation granularity is real but bounded, documented in `mcrag/service/api.py`'s module docstring:** `answer()` buffers the full model reply before yielding any `token`/`citation` (refusal must replace them entirely, not retract after the fact), so the generator is only suspended at a `yield` before retrieval starts (moot) and right after `sources`/before the model call begins (the one place that matters, and the one this task's disconnect test exercises) — a disconnect noticed mid-generation-call cannot interrupt that call early with this generator shape.
 
 **Dependencies:** T24 · **Scope:** M
+
+**Resolution:** done 2026-09-23. New: `mcrag/service/api.py` (`create_app`, `_stream`, `AskRequest`), `mcrag/service/config.py` (`Settings`), `mcrag/service/health.py` (`get_health_info`), `tests/test_api.py` (11 tests). `pyproject.toml`: new `service` extra (`fastapi`, `uvicorn[standard]`) — optional, `mcrag.service.answer` stays importable with nothing here installed; `httpx` added to `dev` (`TestClient`'s transport).
 
 ## Task 26: Early `sources` emission + freshness
 
@@ -1094,40 +1164,46 @@ Emitting sources at rerank time lets *any* client fill that gap with the trust
 surface instead of a spinner — widget, site and terminal all get it free.
 
 **Acceptance criteria:**
-- [ ] `sources` is emitted **before the first generation token is requested**, not merely before the first token is yielded
-- [ ] Each source carries `title`, `url`, `silo`, `heading_path`, `rerank_score`, `last_verified`
-- [ ] Staleness flag computed from `crawled_at` against a configurable threshold
-- [ ] Measured gap between `sources` and first `token` is logged — it is the UX number this whole design exists to fill
+- [x] `sources` is emitted **before the first generation token is requested**, not merely before the first token is yielded — already true of T24's `answer()` by construction (the `yield SourcesEvent(...)` happens before `pipeline.generator.generate(...)` is ever called); now proved rather than merely ordered, by `test_no_generation_call_happens_before_sources_is_consumed` (pulls exactly one event, asserts the fake generator's call list is still empty)
+- [x] Each source carries `title`, `url`, `silo`, `heading_path`, `rerank_score`, `last_verified` — done in T24; unchanged here
+- [x] Staleness flag computed from `crawled_at` against a configurable threshold — new `SourceChunk.stale` field (`mcrag/service/events.py`), computed in `mcrag/service/answer.py`'s `_source_events` against `DEFAULT_STALENESS_DAYS = 180` (a starting default, not a measured/decided value — no staleness/trust study backs it), overridable per call via `answer(..., staleness_days=..., now=...)`
+- [x] Measured gap between `sources` and first `token` is logged — `mcrag.service.answer`'s stdlib `logging.getLogger(__name__)` logs `sources_to_first_token_ms` once TTFT is known, timed from the instant `SourcesEvent` is yielded (not from when the prompt happens to finish building), regardless of whether the request is later refused
 
-**Verification:** Timing test asserts `sources` arrives at least 1s before first `token` on a reasoning-heavy question.
+**Verification:** `tests/test_service.py` (+4 tests): the suspension-point proof above; `stale` true/false against a fixed `now` and threshold on either side; the log line asserted via `caplog`. `docs/stream_contract.md` updated (`stale` field + JSON example) and `tests/test_stream_contract.py`'s doc/model round-trip catches any future drift (`extra="forbid"` — a `stale`-less doc example now fails loudly, same mechanism T23 built). Full suite: 587 passed. **What this does not claim:** the plan's own "sources arrives at least 1s before first token on a reasoning-heavy question" needs a real `gemma4:31b` reasoning delay to observe — a fake generator responds instantly, so that number isn't something a test double can produce honestly; not yet run, same real-quota-report convention as T24's injection check and T25's live `/ask`.
 
 **Dependencies:** T25 · **Scope:** S
+
+**Resolution:** done 2026-09-23. Changed: `mcrag/service/events.py` (`SourceChunk.stale`), `mcrag/service/answer.py` (`DEFAULT_STALENESS_DAYS`, `_source_events` threshold logic, `logger`/`sources_to_first_token_ms`, `answer(staleness_days=, now=)`), `docs/stream_contract.md`, `tests/test_service.py` (+4 tests). No new files, no dependency changes — this task extended T24's module rather than adding a new one.
 
 ## Task 27: Refusal path + office routing
 
 **Acceptance criteria:**
-- [ ] Threshold, answerability gate and model-initiated refusal all wired, with **any-signal-wins** precedence (§4e). The threshold is Task 21's: raw cross-encoder MaxP score over the frozen top 5, refuse below τ = 4.96 (`decisions/0009`). It adds a local cross-encoder pass per answer, so T24 measures that latency
-- [ ] All three signals plus the resolved winner logged per request
-- [ ] Refusal resolves the owning office via `data/offices.yaml` (T8) and emits contact fields
-- [ ] Unroutable refusal falls back to a general contact rather than emitting an empty office
+- [x] Threshold and model-initiated refusal wired, with **any-signal-wins** precedence (§4e), realized as short-circuit order: the threshold (Task 21's raw cross-encoder MaxP score over the frozen top 5, refuse below τ = 4.96, `decisions/0009`) runs first, on retrieval output alone, so a threshold refusal spends no generation quota; `model` (the model declining in its own text, T24) is only reached when `threshold` passed. It adds a local cross-encoder pass per answer, and that latency is now reported in `LatencyMs.rerank` (previously always `null`, since `decisions/0007` only froze the *retrieval* reranker stage off — this is a different use of the same model). **The third named signal, `gate` (an answerability gate ahead of generation), is deliberately not wired** — see Resolution below
+- [x] Both wired signals plus the resolved winner logged per request (`mcrag.service.answer`'s `logger`, `refusal_signals ...` line); `gate` is logged as a fixed `False`/`None` rather than omitted
+- [x] Refusal resolves the owning office via `data/offices.yaml` (T8, new `mcrag/offices.py`) and emits contact fields, keyed on the top-ranked retrieved chunk's silo
+- [x] Unroutable refusal (no chunk retrieved, or its silo has no row) falls back to a general contact (`mcrag.offices.GENERAL_SILO = "admissions"`, a Task 27 policy decision) rather than emitting an empty office
 
-**Verification:** Force each of the three pathways in a test; assert precedence and a populated contact on every refusal.
+**Verification:** `tests/test_offices_module.py` (4 tests, `mcrag.offices.resolve` against a fake table and the real one). `tests/test_service.py` (+7 tests): threshold-fires-and-skips-generation, threshold-passes-and-generation-proceeds, zero-retrieved-chunks refuses via `threshold` with no score, silo-routed office on a threshold refusal, general-fallback office when nothing was retrieved, `gate` is never emitted across three forced scenarios (threshold fires / model fires / neither fires), all-signals-plus-winner logged. `docs/stream_contract.md` updated (`reason`/`rerank` field descriptions, JSON examples) and `tests/test_stream_contract.py`'s doc/model round-trip still passes unchanged (no new fields, `extra="forbid"` still holds). Full suite: 598 passed.
 
 **Dependencies:** T26, T8, T21 · **Scope:** M
+
+**Resolution:** done 2026-09-23. **The `gate` pathway is explicitly out of scope for this task**, by human decision (`AskUserQuestion`, this session): `decisions/0014` already built and rejected a dedicated two-step LLM answerability gate (rung 3) — it fully closed the out-of-scope gap but cost `-0.217 [-0.350, -0.083]` refusal_correct, outside every noise floor measured in this project and worse than rung 2's own rejected cost. Re-wiring a gate here without new evidence would re-litigate a settled, evidence-backed decision, which this project's ablation-logging convention (log every arm tried and why losers lost) exists to prevent. `RefusalEvent.reason`'s `"gate"` literal stays schema-valid for forward compatibility; no code path in `mcrag/service/answer.py` ever constructs one (asserted by test). Changed: `mcrag/offices.py` (new — silo → contact lookup, `OfficeContact`, `resolve`, `GENERAL_SILO`), `tests/test_offices_module.py` (new, 4 tests), `mcrag/service/answer.py` (`TAU`, threshold-gate wiring ahead of generation, `_office_fields`, any-signal-wins short-circuit, `refusal_signals` logging, `LatencyMs.rerank` now populated, `AnswerPipeline.score_pairs`), `tests/test_service.py` (+7 tests, `FakeScorer`, `_pipeline(score_pairs=...)`), `docs/stream_contract.md`.
 
 ## Task 28: Conversation memory + follow-up rewriting
 
 **Description:** The mechanism the ~15-question multi-turn gold slice measures.
 
 **Acceptance criteria:**
-- [ ] History accepted per-request; server holds no session state it cannot rebuild
-- [ ] De-contextualization rewrites a follow-up into a standalone query before retrieval (§4c step 5)
-- [ ] `rewritten_query` is visible in the response payload and in logs — silent rewriting is undebuggable
-- [ ] Evaluated against the multi-turn slice; **result reported even if it is bad**
+- [x] History accepted per-request; server holds no session state it cannot rebuild — `AskRequest.history` (prior user turns only, no session id, no server-side store); prior turns are re-answered live each request rather than cached, so a restart loses nothing and two processes need no session affinity
+- [x] De-contextualization rewrites a follow-up into a standalone query before retrieval (§4c step 5) — `LlmDecontextualizer` (`mcrag/retrieval/reformulation.py`), wired as `AnswerPipeline.reformulator`, called before any retrieval leg runs
+- [x] `rewritten_query` is visible in the response payload and in logs — `SourcesEvent.rewritten_query` (documented in `docs/stream_contract.md`) plus a `rewritten_query=...` log line; `null`/absent when no rewrite happened, so the field never falsely claims one
+- [x] Evaluated against the multi-turn slice; **result reported even if it is bad** — `decisions/0015`, pre-registered before running, all three arms logged with why the loser lost
 
-**Verification:** Run the multi-turn dev slice through it; compare recall against feeding the raw follow-up.
+**Verification:** `scripts/run_t28_decontextualization.py`, pre-registered in `decisions/0015-decontextualization.md` before any arm ran. Pool: the 9 dev+train `multi_turn` questions (test's 6 excluded — spent once at T22b and not read here); dev-only n=3 reported as a pre-registered secondary. `all_golds_retrieved@5` (≡ `recall@5` on this slice: every multi-turn question has exactly 1 gold ref): arm 0 raw follow-up **0.222** → arm 1 free history-concatenation **0.556** (+0.333 [−0.111, +0.778], 4 improved / **1 regressed** → fails the pre-registered zero-regression clause) → arm 2 `LlmDecontextualizer` **0.667** (+0.444 [+0.111, +0.778], 4 improved / 0 regressed → clears). Noise floor for arm 2: **+0.0000 [+0.0000, +0.0000]**, the rerun reproducing all 9 rewrites byte-identically at `temperature=0`; 0 fallbacks. Arm 2 beats arm 1 by exactly one question (mt-03, +0.111 [+0.000, +0.333]). Tests: `tests/test_reformulation.py` (+14, 29 total: both step-5 arms, no-call-without-history, quote/label stripping, all four fallback paths, usage accounting), `tests/test_service.py` (+11, 38 total: retrieval-on-rewrite, generation-on-original, `rewritten_query` published and logged, fan-out takes the first query only, `latency_ms.reform`, threshold gate scores the rewrite, no state between requests, shipped-default guard), `docs/stream_contract.md` + `tests/test_stream_contract.py` round-trip. Full suite: **624 passed**.
 
 **Dependencies:** T27 · **Scope:** M
+
+**Resolution:** done 2026-09-23. **Arm 2 adopted as the service default** (`get_default_pipeline` configures `LlmDecontextualizer` at `gemma4:31b`, `temperature=0`, `max_tokens=128` — the configuration measured, not a re-tuned one). Two decisions were escalated before running, because both would have been post-hoc selection if made after seeing results: (a) **the eval pool** — T28's stated verification names the dev multi-turn slice, which is only n=3; the human decision was the 9 dev+train questions as primary with dev-only as a pre-registered secondary, on the grounds that no model is trained anywhere in this project so `train` had never been read by any script (now spent, recorded in `decisions/0015` so no later task treats it as unused); test stays excluded. (b) **metered authorization** for arm 2 (~18 short completions including the noise-floor rerun). Two things are deliberately *not* claimed: mt-02/mt-07/mt-11 miss at k=5 under all three arms despite good rewrites — a retrieval/coverage ceiling step 5 cannot fix, so the slice goes 2/9 → 6/9, not 9/9 — and `mrr` slightly favors arm 1 (0.481 vs 0.454) purely because arm 1 *drops* mt-03 instead of carrying it at rank 4, which is why the primary metric was fixed in advance. Also flagged, not fixed: τ (4.96, `decisions/0009`) now scores against the rewritten query, but was calibrated on standalone questions containing no under-specified follow-ups, so that choice is reasoned rather than validated; re-calibrating τ for multi-turn traffic is out of scope. Changed: `mcrag/retrieval/reformulation.py` (`HistoryConcatenationReformulator`, `LlmDecontextualizer`, `DECONTEXTUALIZE_SYSTEM_PROMPT`, `Sequence` history on all rungs), `mcrag/interfaces.py` (`Reformulator.reform`'s `history` annotation corrected from the never-read `list[tuple[str, str]]` to `Sequence[str]`), `mcrag/service/events.py` (`SourcesEvent.rewritten_query`, `LatencyMs.reform`, `RefusalEvent` docstring's stale `gate` description), `mcrag/service/answer.py` (`reformulator` field, rewrite-before-retrieval, retrieve-on-rewrite/generate-on-original, `REWRITE_MAX_TOKENS`, adopted default), `mcrag/service/api.py` (`AskRequest` statelessness docstring), `decisions/0015-decontextualization.md` (new), `scripts/run_t28_decontextualization.py` (new), `docs/stream_contract.md`, `tests/test_reformulation.py`, `tests/test_service.py`.
 
 ## Task 29: Reference client (disposable)
 
