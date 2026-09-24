@@ -1251,10 +1251,10 @@ decided it is a new client against a frozen contract.
 ## Task 31: Architecture diagram + README
 
 **Acceptance criteria:**
-- [ ] Offline ingest and online query paths both drawn
-- [ ] Three-line crawl policy statement present (T2)
-- [ ] Corpus coverage numbers cited from the manifest (T4), not estimated
-- [ ] Setup instructions actually followed on a clean checkout
+- [x] Offline ingest and online query paths both drawn (mermaid in README)
+- [x] Three-line crawl policy statement present (T2)
+- [x] Corpus coverage numbers cited from the manifest (T4), not estimated — found `docs/coverage.md` stale (fetched 1857 vs manifest 1847); regenerated
+- [x] Setup instructions actually followed on a clean checkout — found two README gaps (missing service/index/scoring extras) and fixed them; 626 pass, 2 need gitignored corpus artifacts, documented
 
 **Dependencies:** T30 · **Scope:** S
 

@@ -105,9 +105,15 @@ spelled out in `tasks/plan.md`.
 
 ```bash
 python -m venv .venv && .venv/Scripts/activate   # Windows; use .venv/bin/activate elsewhere
-pip install -e ".[dev,service]"   # the API tests need the service extra
+pip install -e ".[dev,service,index,scoring]"   # tests import all four extras
 pytest
 ```
+
+On a fresh clone `pytest` gives 626 passed, 2 failed (verified 2026-09-24). The two
+failures (`tests/test_gold_v1.py`) need `corpus/chunks.jsonl`, a gitignored build
+artifact; `corpus/` and `indexes/` are rebuilt by the ingest scripts in order
+(`fetch_corpus`, `extract_corpus`, `chunk_corpus`, `build_indexes`), and the
+embedding install is large (torch).
 
 Generation runs against Ollama Cloud's free tier. Copy `.env.example` to `.env`
 and fill in the key; embedding and reranking run locally and need no key.
