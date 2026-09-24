@@ -126,16 +126,23 @@ One run per case, n=1 each, on a non-deterministic endpoint: a spot check, not
 a rate. Nothing was changed in the repo; the script patched `TAU` in memory
 to switch the retrieval gate off so the model itself saw each attack.
 
-**Layers between an attack and an answer** (from the code, not measured
-separately): (1) the retrieval-score gate `TAU=4.96` (`decisions/0009`) refuses
-before any generation call, and is only incidentally a defence; (2) the fixed
-`SERVICE_SYSTEM_PROMPT`, identical on every call, naming override, disclosure
-and role-play; (3) the user turn wrapped in `<question>` tags, told to be treated
-as data; (4) `looks_like_a_refusal` classifying a refusal-shaped reply into a
-`refusal` event with office contact; (5) `x-api-key` on `/ask` (fails closed
-with no token); (6) a stateless service, with history limited to prior user
-turns. There is **no input sanitising**: `</question>` inside a user turn is not
-escaped. Layers 2 to 4 are the only ones the model-level test exercises.
+**Layers between an attack and an answer** (state after Phase 6b; the model-level test
+exercises layers 3 to 5 only):
+
+| # | Layer | What it covers | What it does not |
+|---|---|---|---|
+| 1 | `x-api-key` on `/ask` | Unauthenticated callers; fails closed when no token is set | Anything an authorised caller sends |
+| 2 | Retrieval-score gate, `TAU=4.96` (`decisions/0009`) | Caught 16 of 16 T39 cases before the model, at zero quota | Over-refuses: 3 of those 16 were genuine questions, and it refuses real questions generally |
+| 3 | Fixed `SERVICE_SYSTEM_PROMPT` | Override, disclosure and role-play, by instruction; held on all 16 cases with the gate off | Tuned for `gemma4:31b` only; prompt-only abstention is known to be weak under misleading context |
+| 4 | `DelimiterEscaper` (T38) | Forged `<question>`/`<passages>` tags; the passage-forgery case had no effect | Paraphrased instructions, which carry no delimiters |
+| 5 | `NarrowPhraseClassifier` (T40, `decisions/0016`) | Routes a refusal-shaped reply to a `refusal` event with office contact; 16 of 16 routed live | Wording-based, post-hoc, validated at n=4 plus zero dev regressions |
+| 6 | Stateless service, history = prior user turns only | No server-side state to poison across requests | The client supplies history, so a client can forge it |
+| 7 | No tools, read-only corpus | There is nothing to hijack: no sending, writing, or spending. The largest structural win | Nothing, but it is why agent-style defences (CaMeL-style) are out of scope here |
+
+Not present: any trained guardrail classifier, output scanning for secrets, rate
+limiting, or alerting. The corpus was scanned once for injected instructions
+(T37: 37 candidates, 0 real, `docs/injection_scan_triage.md`), which is a
+snapshot result, not a standing control.
 
 | Case | Model behaviour | Delivered as |
 |---|---|---|

@@ -67,9 +67,9 @@ Design rationale lives in `PLAN.md`.
 - [x] T38 · Escape delimiter tokens in user text (S) — free
 - [x] T39 · Injection regression suite, stubbed + live report (M)
 - [x] T40 · Service refusal classifier, offline replay (M) — free, dev/train only
-- [ ] T41 · Structured decision field for refusal (M) — **live quota, needs go-ahead**
+- [ ] T41 · Structured decision field for refusal (M) — **live quota, needs go-ahead** — **deferred, awaiting go-ahead**
 - [x] T42 · Sources-before-tokens timing and one-piece delivery (S)
-- [ ] **Checkpoint 6b** — service hardening reviewed
+- [x] **Checkpoint 6b** — service hardening reviewed
 
 ## Phase 7 — Maintenance · *a cron job and four alerts*
 - [ ] T34 · Scheduled re-crawl + the four alerts (M)

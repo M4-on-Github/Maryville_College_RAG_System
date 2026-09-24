@@ -1346,10 +1346,11 @@ Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, c
 **Result:** cause is ours, not the provider's — `answer.py` buffers all tokens so the refusal classifier can see the complete text; the generator itself streams (64-66 events over 0.32-0.43 s). Decision: **claim corrected, no fix shipped.** Streaming and answer-level refusal conflict; a prefix-classification fix is logged as a candidate needing its own arm. Re-measured over 6 warm calls: median 0.950 s, 2 of 6 reached 1 s, so the "at least 1 s" claim is dropped and only the tested ordering property is claimed.
 **Verification:** measured numbers in `docs/LIMITATIONS.md` §7; the plan's Checkpoint F line matches them.
 
-### ✅ Checkpoint 6b: service hardening reviewed
-- [ ] T37 to T40 and T42 done or explicitly waived; T41 done or explicitly deferred
-- [ ] `docs/LIMITATIONS.md` section 7 updated to what the new numbers say
-- [ ] Layer table (input, gate, prompt, model, output, access, ops) states what each layer now covers and does not
+### ✅ Checkpoint 6b — service hardening reviewed
+- [x] T37, T38, T39, T40, T42 done; **T41 deferred** — it spends generation quota and changes a frozen prompt, so it waits for an explicit go-ahead
+- [x] `docs/LIMITATIONS.md` section 7 updated to what the new numbers say
+- [x] Layer table (7 layers) states what each layer now covers and does not
+- [x] Full suite 710 passed after the phase (628 before it)
 
 ---
 
