@@ -1284,6 +1284,71 @@ decided it is a new client against a frozen contract.
 
 ---
 
+# Phase 6b — Service hardening (added 2026-09-24)
+
+Origin: the live safeguard check in `docs/LIMITATIONS.md` section 7 (4 of 7 refusals
+unrouted, sources-to-token gap under 1 s, answers arriving in one piece, no input
+escaping) plus the industry research (OWASP LLM prompt-injection cheat sheet,
+Microsoft delimiting/datamarking, structured abstention). Free tasks first; the
+one task that spends quota (T41) waits for its own go-ahead. Every arm is
+pre-registered before it runs and every arm tried is logged with why losers lost.
+`train`/`dev` only: the test split is not touched.
+
+## Task 37: Scan the corpus for indirect-injection text (free)
+Instruction-like text inside crawled pages is the one injection route the live check did not cover.
+**Acceptance:**
+- [ ] A deterministic scanner over `corpus/chunks.jsonl` flags instruction-like patterns; the pattern list is fixed in the script before the first run
+- [ ] Output: count, per-pattern hits and the flagged chunk ids and URLs, in `docs/`
+- [ ] Every hit is triaged by hand as benign or real, and the tally is reported (no "clean" claim without the list)
+**Verification:** re-running the scanner on the same `chunks.jsonl` gives a byte-identical report.
+
+## Task 38: Escape delimiter tokens in user text (free)
+`</question>` in a user turn is not escaped today.
+**Acceptance:**
+- [ ] A `PromptSanitizer` class behind an interface neutralises `<question>`, `</question>`, `<passages>` and `</passages>` in user and history text; a benign question is unchanged
+- [ ] Applied at the one place the user turn is wrapped; unit tests cover each token, case variants and a benign control
+- [ ] The frozen retrieval config and generation prompt text are untouched
+**Verification:** full test suite passes; the fake-tag live case is re-run in T39.
+
+## Task 39: Injection regression suite (free, then small live)
+**Acceptance:**
+- [ ] A fixed case file: the 7 live cases plus new phrasings, multi-turn attacks and encoded payloads (base64, typoglycemia), each with its expected outcome; written before any run
+- [ ] A runner with a stubbed generator (in pytest) checks plumbing; a separate script runs it live and writes a dated report, never a pytest assertion
+- [ ] Live results reported per case, n=1 and marked non-deterministic; repeated runs for any case that flips
+**Verification:** live report committed under `docs/`; pass/fail counts stated, failures listed.
+
+## Task 40: Service refusal classifier, offline replay (free)
+The eval classifier `looks_like_a_refusal` stays frozen so historical `refusal_correct` stays comparable.
+**Acceptance:**
+- [ ] `ServiceRefusalClassifier` class behind the refusal interface, in the service only; variants pre-registered: (0) current, (1) widened phrases, (2) cite-nothing rule, (3) 1+2 combined
+- [ ] Replay over saved `per_query.jsonl` answers, dev and train only, plus the 4 missed live refusals; report catch rate on known refusals and legitimate answers wrongly flipped, for every variant
+- [ ] Decisions doc lists every variant and why losers lost; the winner is wired only if it catches the 4 misses with zero legitimate answers flipped, otherwise the result is logged and nothing ships
+**Verification:** replay script is deterministic and re-runnable; full test suite passes.
+
+## Task 41: Structured decision field for refusal (live quota)
+Answer or abstain becomes a schema field rather than parsed prose. Changes the frozen prompt of `decisions/0014`, so it is an A/B and not a swap.
+**Acceptance:**
+- [ ] **Waits for an explicit go-ahead**, because it spends generation quota and touches a frozen prompt
+- [ ] Arms pre-registered: control = current prompt + T40 winner; arm = structured `decision` field; noise-floor rerun of the control beside it
+- [ ] Dev only. Report refusal_correct, out-of-scope answered count, Tier 1 faithfulness, and cost as a median, each with CI and against the noise floor
+- [ ] Adopted only if it clears the noise floor; otherwise logged as rejected
+**Verification:** run dirs with config, split hash and model lock; decisions doc with every arm.
+
+## Task 42: Sources-before-tokens timing and one-piece delivery
+Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, citation and done arrive within about 0.05 s of each other.
+**Acceptance:**
+- [ ] Find out whether the generator is non-streaming or the service buffers; report the cause with evidence (code path and timestamps)
+- [ ] Decide fix or limitation: either make streaming incremental, or change the claim to what was measured; state which
+- [ ] If a fix is made, re-measure live over at least 5 warm calls and report the median, not the best
+**Verification:** measured numbers in `docs/LIMITATIONS.md`; the claim in the plan matches them.
+
+### ✅ Checkpoint 6b: service hardening reviewed
+- [ ] T37 to T40 and T42 done or explicitly waived; T41 done or explicitly deferred
+- [ ] `docs/LIMITATIONS.md` section 7 updated to what the new numbers say
+- [ ] Layer table (input, gate, prompt, model, output, access, ops) states what each layer now covers and does not
+
+---
+
 # Phase 7 — Maintenance
 
 Development ends; the college's website does not. This phase is **a cron job and

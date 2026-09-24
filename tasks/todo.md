@@ -62,6 +62,15 @@ Design rationale lives in `PLAN.md`.
 - [ ] T33 · Recorded demo walkthrough (S)
 - [ ] **Checkpoint G** — shipped
 
+## Phase 6b — Service hardening
+- [ ] T37 · Scan corpus for indirect-injection text (S) — free
+- [ ] T38 · Escape delimiter tokens in user text (S) — free
+- [ ] T39 · Injection regression suite, stubbed + live report (M)
+- [ ] T40 · Service refusal classifier, offline replay (M) — free, dev/train only
+- [ ] T41 · Structured decision field for refusal (M) — **live quota, needs go-ahead**
+- [ ] T42 · Sources-before-tokens timing and one-piece delivery (S)
+- [ ] **Checkpoint 6b** — service hardening reviewed
+
 ## Phase 7 — Maintenance · *a cron job and four alerts*
 - [ ] T34 · Scheduled re-crawl + the four alerts (M)
 - [ ] T35 · **Gold-set decay** — content-hash pinning, stale accounting (M) ← *the one that corrupts measurements, not the product*
