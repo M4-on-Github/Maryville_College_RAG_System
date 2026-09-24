@@ -12,6 +12,9 @@ dependencies = [
     "requests>=2.31",
     "trafilatura>=1.8",
     "lxml>=5.0",
+    # Task 23: the stream contract's models, and Task 25's FastAPI shell
+    # after it -- one dependency, not two, since FastAPI is built on it.
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
