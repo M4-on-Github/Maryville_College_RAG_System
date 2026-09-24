@@ -1227,7 +1227,7 @@ decided it is a new client against a frozen contract.
 - [x] Contract frozen and documented; a second client could be written from the doc alone (T29 client built against the doc; found the `EventSource`/`X-API-Key` gap)
 - [x] Service callable runs with no server (`tests/test_service.py`)
 - [x] Sources-before-tokens **ordering** verified (design property, tested). The **"at least 1 s" gap claim is dropped as unsupported** — T42 re-measured 6 warm calls: 0.796/0.989/1.202/0.660/1.105/0.911 s, median 0.950 s, 2 of 6 at 1 s; spread is cloud noise. Answers are delivered in one piece by design: `answer.py` buffers tokens so the refusal classifier sees the whole text (see `docs/LIMITATIONS.md` §7 and Task 42). Also run live 2026-09-24: `curl -N POST /ask` works over real SSE (T25); the three fixed injection attempts (T24) were refused by the retrieval gate before the model, and with the gate patched off in memory the model declined all seven attack cases with no system-prompt leak and no injected output, though 4 of 7 refusals were unrouted (fixed in T40). Real-browser open of the client (T29) was done against the zero-quota demo server only.
-- [x] Refusal always routes to a real office (code + tests; live refusal run still open, see above)
+- [x] Refusal always routes to a real office (code + tests; **live run done** 2026-09-24 — T39: 16 of 16 refusals routed with office contact at the model layer, `docs/injection_regression_report.md`)
 - [x] **No UI decision has been made or needed**
 
 ---

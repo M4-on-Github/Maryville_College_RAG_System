@@ -138,6 +138,15 @@ ablation table, not the demo, is the centerpiece.
 
 ## Status
 
-Backend complete through Checkpoint F. Not yet done: the recorded demo (T33), and live-quota checks of the streaming timing
-claim and prompt-injection refusals (the reference client had a real-browser pass
-against the zero-quota demo server only), which are recorded as open in `tasks/plan.md` rather than claimed.
+Backend complete through Checkpoint F, plus Phase 6b service hardening
+(Checkpoint 6b). The live-quota checks have now been run against real
+`gemma4:31b`: `curl -N POST /ask` over real SSE, a 16-case injection regression
+(`docs/injection_regression_report.md`), and the streaming timing measurement —
+which **failed its claim**, so the "sources arrive at least 1 s before the first
+token" claim was dropped rather than fixed, and only the tested ordering property
+is claimed (`docs/LIMITATIONS.md` §7).
+
+Not yet done: the recorded demo (T33), the structured-refusal A/B (T41, deferred
+because it spends quota and changes a frozen prompt), and Phase 7 maintenance.
+The reference client's real-browser pass covered the zero-quota demo server only.
+Everything open is recorded in `tasks/plan.md` rather than claimed.
