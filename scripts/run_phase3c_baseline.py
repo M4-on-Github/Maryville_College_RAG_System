@@ -35,8 +35,6 @@ import json
 import os
 import statistics
 import sys
-from dataclasses import replace
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -60,53 +58,26 @@ from mcrag.retrieval.bge_embedder import MODEL_NAME, BgeEmbedder  # noqa: E402
 from mcrag.retrieval.bm25 import BM25Index  # noqa: E402
 from mcrag.retrieval.dense import DenseIndex  # noqa: E402
 from mcrag.retrieval.embedding_cache import EmbeddingCache  # noqa: E402
-from mcrag.retrieval.fusion import RRFFuser  # noqa: E402
+
+# Task 24: this frozen build now lives in one shared module so the answer
+# service builds the identical retrieval pipeline rather than a hand-synced
+# copy of it -- see mcrag/retrieval/frozen_pipeline.py.
+from mcrag.retrieval.frozen_pipeline import (  # noqa: E402
+    CANDIDATE_K,
+    CHUNKS_PATH,
+    GOLD_CHUNKS_PATH,
+    INDEX_DIR,
+    K,
+    build_search,
+    load_chunks,
+)
 from mcrag.retrieval.literal import LiteralIndex  # noqa: E402
 from mcrag.runlog import Lock, RunDir  # noqa: E402
-from mcrag.types import Chunk, GoldQuestion, Hit  # noqa: E402
-
-# The frozen config, decisions/0007: boilerplate off, FixedSizeChunker(512).
-CHUNKS_PATH = Path("corpus/baseline_chunks_no_boilerplate.jsonl")
-INDEX_DIR = Path("indexes/baseline_dense_no_boilerplate")
-GOLD_CHUNKS_PATH = Path("corpus/chunks.jsonl")  # what gold ids are authored against
+from mcrag.types import Chunk, GoldQuestion  # noqa: E402
 
 GOLD_PATH = Path("data/gold/gold_v1.jsonl")
 SPLIT_LOCK_PATH = Path("data/gold/split.lock")
-K = 5
-CANDIDATE_K = 20
 REPRO_REPORT_PATH = Path("runs/phase3c_reproducibility.json")
-
-
-def load_chunks(path: Path) -> list[Chunk]:
-    chunks = []
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            raw = json.loads(line)
-            chunks.append(
-                Chunk(
-                    chunk_id=raw["chunk_id"], source_url=raw["source_url"], title=raw["title"],
-                    text=raw["text"], heading_path=tuple(raw["heading_path"]),
-                    breadcrumb=tuple(raw["breadcrumb"]), silo=tuple(raw["silo"]),
-                    content_hash=raw["content_hash"], crawled_at=datetime.fromisoformat(raw["crawled_at"]),
-                    token_count=raw["token_count"], catalog_year=raw.get("catalog_year"),
-                )
-            )
-    return chunks
-
-
-def build_search(dense, bm25, literal, chunk_lookup: dict[str, Chunk]):
-    fuser = RRFFuser()
-
-    def search(query: str) -> list[Hit]:
-        leg_results = [
-            dense.search(query, CANDIDATE_K),
-            bm25.search(query, CANDIDATE_K),
-            literal.search(query, CANDIDATE_K),
-        ]
-        hits = fuser.fuse(leg_results, CANDIDATE_K)
-        return [replace(h, chunk=chunk_lookup.get(h.chunk_id)) if h.chunk is None else h for h in hits]
-
-    return search
 
 
 def tier1_fields(faithfulness: NLIFaithfulnessScorer, answer: str, context: list[str]) -> dict[str, Any]:

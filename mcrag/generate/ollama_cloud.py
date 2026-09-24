@@ -321,6 +321,12 @@ class OllamaCloudGenerator(Generator):
                     "server_s": usage_obj.server_s,
                     "timing_source": usage_obj.timing_source,
                     "seconds": usage_obj.seconds,
+                    # Task 24: the provider's own nanosecond durations
+                    # (`eval_duration`/`prompt_eval_duration`, if reported),
+                    # for a caller that needs `server_ns`'s split rather than
+                    # just the combined `server_s` above. Additive -- nothing
+                    # upstream of Task 24 reads this key.
+                    "raw": usage_obj.raw,
                 },
             },
         )
