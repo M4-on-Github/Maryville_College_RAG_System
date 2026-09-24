@@ -10,6 +10,7 @@ import re
 from typing import Protocol
 
 from mcrag.eval.tier0_scoring import extract_cited_urls, looks_like_a_refusal
+from mcrag.generate.decision_field import ABSTAIN, parse_decision
 
 
 class RefusalClassifier(Protocol):
@@ -67,6 +68,26 @@ class CombinedClassifier:
 
     def is_refusal(self, answer: str) -> bool:
         return any(p.is_refusal(answer) for p in self._parts)
+
+
+class DecisionFieldClassifier:
+    """T41 (decisions/0017): read the model's own `DECISION:` line instead of
+    inferring refusal from prose. Falls back to `fallback` when the line is absent,
+    because a protocol violation must not silently become "did not refuse".
+
+    **Wired nowhere by default.** It is only correct with
+    `DECISION_FIELD_SYSTEM_PROMPT`, and whether that prompt ships is decided by the
+    T41 arm, not by this class existing.
+    """
+
+    def __init__(self, fallback: RefusalClassifier | None = None) -> None:
+        self._fallback = fallback if fallback is not None else NarrowPhraseClassifier()
+
+    def is_refusal(self, answer: str) -> bool:
+        decision, _rest = parse_decision(answer)
+        if decision is None:
+            return self._fallback.is_refusal(answer)
+        return decision == ABSTAIN
 
 
 VARIANTS: dict[str, RefusalClassifier] = {

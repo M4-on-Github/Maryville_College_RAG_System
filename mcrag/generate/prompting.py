@@ -95,6 +95,24 @@ ANSWERABILITY_CHECK_SYSTEM_PROMPT = (
     "else on that line. A brief one-sentence reason may follow on a second line."
 )
 
+# Task 41 (decisions/0017): the service decides "did the model refuse?" by matching
+# regexes against prose, so a refusal worded in a way the pattern list does not
+# anticipate is streamed as an ordinary answer. This asks the model to *emit* the
+# decision as a field instead, so the service can read it rather than infer it.
+# Additive: SCOPE_STRICT_SYSTEM_PROMPT is untouched, and this is a pre-registered
+# A/B arm against it (decisions/0014's adopted config), not a replacement.
+# `mcrag.generate.decision_field` parses what this asks for.
+DECISION_FIELD_SYSTEM_PROMPT = (
+    SCOPE_STRICT_SYSTEM_PROMPT
+    + " Format your reply as follows. The first line must be exactly "
+    "`DECISION: ANSWER` or exactly `DECISION: ABSTAIN`, with nothing else on "
+    "that line. Use ABSTAIN when the passages do not specifically address the "
+    "question asked, and ANSWER when they do. Leave the next line blank, then "
+    "write your reply: if you abstained, state in one sentence what the "
+    "passages do not cover; if you answered, give the answer, still citing the "
+    "source URL of every passage you use. Never omit the first line."
+)
+
 # Task 24 (PLAN Phase 5, tasks/plan.md T24): SCOPE_STRICT_SYSTEM_PROMPT above
 # already treats <passages> as untrusted data (T16, decisions/0005) -- that
 # defends against a scraped page shaped like an instruction. The answer
