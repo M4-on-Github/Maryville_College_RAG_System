@@ -12,7 +12,7 @@ arrives, not before.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 
 from mcrag.types import Chunk, Document, Event, Hit, RawPage, Score
 
@@ -61,10 +61,21 @@ class Reranker(ABC):
 
 
 class Reformulator(ABC):
-    """Query in, one or more queries out. Each rung of the ladder is a class."""
+    """Query in, one or more queries out. Each rung of the ladder is a class.
+
+    `history` is **prior user turns only, oldest first** -- the shape
+    `GoldQuestion.history` (T12) and `mcrag.service.answer.answer()` both
+    already use. The original `list[tuple[str, str]]` annotation here was
+    written in T1, before any multi-turn data existed, and no implementation
+    ever read it; a (user, assistant) pair was never the right shape, because
+    this pipeline regenerates its own prior answers live (T24's
+    `_run_prior_turns`) rather than trusting a client-supplied transcript of
+    what the assistant previously said. Corrected in T28, the first task with
+    a rung that actually reads history.
+    """
 
     @abstractmethod
-    def reform(self, query: str, history: list[tuple[str, str]] | None = None) -> list[str]: ...
+    def reform(self, query: str, history: Sequence[str] | None = None) -> list[str]: ...
 
 
 class Generator(ABC):
