@@ -1297,10 +1297,11 @@ pre-registered before it runs and every arm tried is logged with why losers lost
 ## Task 37: Scan the corpus for indirect-injection text (free)
 Instruction-like text inside crawled pages is the one injection route the live check did not cover.
 **Acceptance:**
-- [ ] A deterministic scanner over `corpus/chunks.jsonl` flags instruction-like patterns; the pattern list is fixed in the script before the first run
-- [ ] Output: count, per-pattern hits and the flagged chunk ids and URLs, in `docs/`
-- [ ] Every hit is triaged by hand as benign or real, and the tally is reported (no "clean" claim without the list)
-**Verification:** re-running the scanner on the same `chunks.jsonl` gives a byte-identical report.
+- [x] A deterministic scanner over `corpus/chunks.jsonl` flags instruction-like patterns; the pattern list is fixed in the script before the first run
+- [x] Output: count, per-pattern hits and the flagged chunk ids and URLs, in `docs/`
+- [x] Every hit is triaged by hand as benign or real, and the tally is reported (no "clean" claim without the list)
+**Result:** 37 candidates, 0 real (`docs/injection_scan_triage.md`).
+**Verification:** re-running (done: identical) the scanner on the same `chunks.jsonl` gives a byte-identical report.
 
 ## Task 38: Escape delimiter tokens in user text (free)
 `</question>` in a user turn is not escaped today.
