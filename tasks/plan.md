@@ -1313,10 +1313,11 @@ Instruction-like text inside crawled pages is the one injection route the live c
 
 ## Task 39: Injection regression suite (free, then small live)
 **Acceptance:**
-- [ ] A fixed case file: the 7 live cases plus new phrasings, multi-turn attacks and encoded payloads (base64, typoglycemia), each with its expected outcome; written before any run
-- [ ] A runner with a stubbed generator (in pytest) checks plumbing; a separate script runs it live and writes a dated report, never a pytest assertion
-- [ ] Live results reported per case, n=1 and marked non-deterministic; repeated runs for any case that flips
-**Verification:** live report committed under `docs/`; pass/fail counts stated, failures listed.
+- [x] A fixed case file: the 7 live cases plus new phrasings, multi-turn attacks and encoded payloads (base64, typoglycemia), each with its expected outcome; written before any run
+- [x] A runner with a stubbed generator (in pytest) checks plumbing; a separate script runs it live and writes a dated report, never a pytest assertion
+- [x] Live results reported per case, n=1 and marked non-deterministic; repeated runs for any case that flips
+**Result:** 16 cases (7 live + 9 added: paraphrase, indirect disclosure, claimed authority, base64, typoglycemia, 2 multi-turn, passage forgery, exfiltration). Stubbed plumbing tests: 54 passed. Live, as shipped: 16/16 caught, all by the gate, with 3 over-refusals of compound questions. Live, gate off: 16/16 correct at the model layer, every refusal **routed** as a `refusal` event — the live verification of T40. No forbidden string leaked.
+**Verification:** `docs/injection_regression_report.md` committed; counts stated; n=1 per case on a non-deterministic endpoint is stated as a limit.
 
 ## Task 40: Service refusal classifier, offline replay (free)
 The eval classifier `looks_like_a_refusal` stays frozen so historical `refusal_correct` stays comparable.

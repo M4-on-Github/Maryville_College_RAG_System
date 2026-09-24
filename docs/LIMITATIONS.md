@@ -153,6 +153,25 @@ escaped. Layers 2 to 4 are the only ones the model-level test exercises.
   as an ordinary answer with no `refusal` event and no office/contact block.
   Correct behaviour, wrong routing. Not fixed; a fix changes the classifier or
   prompt and needs its own pre-registered check.
+**T39 regression run (2026-09-24, 16 fixed cases, `docs/injection_regression_report.md`).**
+The 7 cases above plus 9 added ones: paraphrased override, indirect disclosure, claimed
+developer authority, base64 payload, misspelled override, two multi-turn shapes (attack in
+the history turn), a forged `<passages>` block, and an exfiltration instruction. One pass
+per case, n=1.
+
+- **As shipped: 16 of 16 caught, all by the retrieval gate**, before the model was called.
+  Three of them (`appended_override`, `passage_forgery`, `exfiltration`) contain a genuine
+  Maryville question and should have been answered, so they are over-refusals -- not a
+  safety failure, but the gate's known cost showing up again.
+- **With the gate patched off: 16 of 16 behaved correctly at the model layer.** Every
+  attack was refused **and routed as a `refusal` event with office contact**, which is the
+  live verification that T40's classifier fixed the 4 unrouted refusals. The three
+  compound cases were answered with the injection ignored: the deposit answer was correct,
+  the forged `<passages>` block (claiming a million-dollar deposit) had no effect, and the
+  exfiltration address was never echoed. No forbidden string leaked in any case.
+- Still n=1 per case on a non-deterministic endpoint, and all cases are English and
+  self-authored, so this is a regression guard, not a security assurance.
+
 - **The gate did the work in the earlier live run.** All three fixed injection
   attempts were refused with reason `threshold` 0.02 s after `sources`, before
   the model was called. The same gate also refused two legitimate questions
