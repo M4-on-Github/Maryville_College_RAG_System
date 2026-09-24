@@ -97,7 +97,7 @@ import logging
 import re
 import time
 from collections.abc import Callable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from mcrag.eval.abstention import maxp_scores, raw_top
@@ -113,6 +113,7 @@ from mcrag.retrieval.fusion import RRFFuser
 from mcrag.retrieval.literal import LiteralIndex
 from mcrag.retrieval.reformulation import LlmDecontextualizer
 from mcrag.retrieval.reranker import CrossEncoderReranker
+from mcrag.service.sanitize import DelimiterEscaper, PromptSanitizer
 from mcrag.service.events import (
     AnyEvent,
     CitationEvent,
@@ -208,6 +209,9 @@ class AnswerPipeline:
     # N*3, so a fan-out rung is not wired here. Both step-5 rungs
     # (`mcrag.retrieval.reformulation`) return exactly one query.
     reformulator: Reformulator | None = None
+    # T38: user text is escaped before it is placed inside the prompt's own
+    # delimiter tags. `NoOpSanitizer` reproduces the pre-T38 behaviour.
+    sanitizer: PromptSanitizer = field(default_factory=DelimiterEscaper)
 
     def search(self, query: str) -> list[Hit]:
         """The same fused-search shape `mcrag.retrieval.frozen_pipeline.build_search`
@@ -269,10 +273,11 @@ def _run_prior_turns(pipeline: AnswerPipeline, user_turns: Sequence[str]) -> lis
     messages: list[dict[str, str]] = []
     for turn in user_turns:
         hits = [h for h in pipeline.search(turn)[:K] if h.chunk is not None]
-        prompt = build_user_prompt(turn, [h.chunk for h in hits], passage_chars=None)
+        safe_turn = pipeline.sanitizer.sanitize(turn)
+        prompt = build_user_prompt(safe_turn, [h.chunk for h in hits], passage_chars=None)
         completion = pipeline.generator.complete(prompt, system=SERVICE_SYSTEM_PROMPT, history=messages)
         messages += [
-            {"role": "user", "content": _as_user_turn(turn)},
+            {"role": "user", "content": _as_user_turn(safe_turn)},
             {"role": "assistant", "content": completion.text},
         ]
     return messages
@@ -463,7 +468,7 @@ def answer(
         generate_ttft_ms = 0.0
         generate_total_ms = 0.0
     else:
-        prompt = build_user_prompt(question, chunks, passage_chars=None)
+        prompt = build_user_prompt(pipeline.sanitizer.sanitize(question), chunks, passage_chars=None)
         ttft_s: float | None = None
         for event in pipeline.generator.generate(prompt, system=SERVICE_SYSTEM_PROMPT, history=history_messages):
             if event.type == "token":

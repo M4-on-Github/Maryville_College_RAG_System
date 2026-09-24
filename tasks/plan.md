@@ -1306,10 +1306,10 @@ Instruction-like text inside crawled pages is the one injection route the live c
 ## Task 38: Escape delimiter tokens in user text (free)
 `</question>` in a user turn is not escaped today.
 **Acceptance:**
-- [ ] A `PromptSanitizer` class behind an interface neutralises `<question>`, `</question>`, `<passages>` and `</passages>` in user and history text; a benign question is unchanged
-- [ ] Applied at the one place the user turn is wrapped; unit tests cover each token, case variants and a benign control
-- [ ] The frozen retrieval config and generation prompt text are untouched
-**Verification:** full test suite passes; the fake-tag live case is re-run in T39.
+- [x] A `PromptSanitizer` class behind an interface neutralises `<question>`, `</question>`, `<passages>` and `</passages>` in user and history text; a benign question is unchanged
+- [x] Applied at the one place the user turn is wrapped; unit tests cover each token, case variants and a benign control
+- [x] The frozen retrieval config and generation prompt text are untouched
+**Verification:** full suite 642 passed (was 628 + new tests); the fake-tag live case is re-run in T39. `NoOpSanitizer` is the control arm.
 
 ## Task 39: Injection regression suite (free, then small live)
 **Acceptance:**

@@ -64,7 +64,7 @@ Design rationale lives in `PLAN.md`.
 
 ## Phase 6b — Service hardening
 - [x] T37 · Scan corpus for indirect-injection text (S) — free
-- [ ] T38 · Escape delimiter tokens in user text (S) — free
+- [x] T38 · Escape delimiter tokens in user text (S) — free
 - [ ] T39 · Injection regression suite, stubbed + live report (M)
 - [ ] T40 · Service refusal classifier, offline replay (M) — free, dev/train only
 - [ ] T41 · Structured decision field for refusal (M) — **live quota, needs go-ahead**
