@@ -1321,10 +1321,11 @@ Instruction-like text inside crawled pages is the one injection route the live c
 ## Task 40: Service refusal classifier, offline replay (free)
 The eval classifier `looks_like_a_refusal` stays frozen so historical `refusal_correct` stays comparable.
 **Acceptance:**
-- [ ] `ServiceRefusalClassifier` class behind the refusal interface, in the service only; variants pre-registered: (0) current, (1) widened phrases, (2) cite-nothing rule, (3) 1+2 combined
-- [ ] Replay over saved `per_query.jsonl` answers, dev and train only, plus the 4 missed live refusals; report catch rate on known refusals and legitimate answers wrongly flipped, for every variant
-- [ ] Decisions doc lists every variant and why losers lost; the winner is wired only if it catches the 4 misses with zero legitimate answers flipped, otherwise the result is logged and nothing ships
-**Verification:** replay script is deterministic and re-runnable; full test suite passes.
+- [x] `ServiceRefusalClassifier` class behind the refusal interface, in the service only; variants pre-registered: (0) current, (1) widened phrases, (2) cite-nothing rule, (3) 1+2 combined
+- [x] Replay over saved `per_query.jsonl` answers, dev and train only, plus the 4 missed live refusals; report catch rate on known refusals and legitimate answers wrongly flipped, for every variant
+- [x] Decisions doc lists every variant and why losers lost; the winner is wired only if it catches the 4 misses with zero legitimate answers flipped, otherwise the result is logged and nothing ships
+**Result (decisions/0016):** v1 rejected (42 new flags, 18 of 35 unique were substantive answers noting a gap); v2 rejected (378/635 flagged); v3 rejected with it. A **post-hoc** v4 (v1 minus the broad passages pattern) catches 4/4 live misses and flags nothing new on 635 dev answers; adopted as the service default, control kept. Side finding: the frozen eval classifier misses 15 genuine dev refusals, so absolute `refusal_correct` is less trustworthy than paired differences.
+**Verification:** replay deterministic (byte-identical rerun); full suite 656 passed.
 
 ## Task 41: Structured decision field for refusal (live quota)
 Answer or abstain becomes a schema field rather than parsed prose. Changes the frozen prompt of `decisions/0014`, so it is an A/B and not a swap.

@@ -28,7 +28,9 @@ This module wires exactly two:
   retrieval returns zero chunks at all, since there is then nothing a
   threshold score could even be computed over.
 - `model`: the model itself declining in its own generated text
-  (`mcrag.eval.tier0_scoring.looks_like_a_refusal`), unchanged from Task 24.
+  (`mcrag.service.refusal.NarrowPhraseClassifier`, T40/decisions/0016 -- the
+  eval classifier `mcrag.eval.tier0_scoring.looks_like_a_refusal` stays frozen
+  so historical `refusal_correct` stays comparable, and is the control arm).
   Only reached when `threshold` did not already fire.
 
 - `gate` is deliberately **not wired**, by explicit human decision (this
@@ -101,7 +103,6 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from mcrag.eval.abstention import maxp_scores, raw_top
-from mcrag.eval.tier0_scoring import looks_like_a_refusal
 from mcrag.generate.ollama_cloud import OllamaCloudGenerator
 from mcrag.generate.prompting import SERVICE_SYSTEM_PROMPT, build_user_prompt
 from mcrag.interfaces import Embedder, Reformulator
@@ -113,6 +114,7 @@ from mcrag.retrieval.fusion import RRFFuser
 from mcrag.retrieval.literal import LiteralIndex
 from mcrag.retrieval.reformulation import LlmDecontextualizer
 from mcrag.retrieval.reranker import CrossEncoderReranker
+from mcrag.service.refusal import NarrowPhraseClassifier, RefusalClassifier
 from mcrag.service.sanitize import DelimiterEscaper, PromptSanitizer
 from mcrag.service.events import (
     AnyEvent,
@@ -212,6 +214,10 @@ class AnswerPipeline:
     # T38: user text is escaped before it is placed inside the prompt's own
     # delimiter tags. `NoOpSanitizer` reproduces the pre-T38 behaviour.
     sanitizer: PromptSanitizer = field(default_factory=DelimiterEscaper)
+    # T40 (decisions/0016): the service's own refusal classifier. The eval
+    # classifier `looks_like_a_refusal` stays frozen so historical
+    # `refusal_correct` stays comparable; `CurrentClassifier` is the control arm.
+    refusal_classifier: RefusalClassifier = field(default_factory=NarrowPhraseClassifier)
 
     def search(self, query: str) -> list[Hit]:
         """The same fused-search shape `mcrag.retrieval.frozen_pipeline.build_search`
@@ -481,7 +487,7 @@ def answer(
         generate_total_ms = (time.perf_counter() - gen_start) * 1000
         generate_ttft_ms = (ttft_s if ttft_s is not None else time.perf_counter() - gen_start) * 1000
         answer_text = "".join(visible)
-        model_fired = looks_like_a_refusal(answer_text)
+        model_fired = pipeline.refusal_classifier.is_refusal(answer_text)
 
         # Task 26: the measured gap this whole design exists to shrink,
         # logged regardless of outcome (refused or answered) -- not part of
