@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+  Task 29: DISPOSABLE REFERENCE CLIENT. NOT A PRODUCT. DO NOT BUILD ON THIS.
+
+  Its only jobs are (a) proving the stream contract works end to end against a
+  real browser, and (b) demoing. It is a test fixture that happens to be HTML.
+  No framework, no build step, no dependency, no styling worth keeping, no
+  accessibility work, no error UX, one file. When the real front end is decided,
+  it is a NEW client written against docs/stream_contract.md -- not a refactor of
+  this file, which should be deleted at that point.
+
+  Everything it knows about the server is in docs/stream_contract.md: five event
+  types, sources first, done last, refusal replacing the token stream entirely.
+  That is deliberate -- if this file ever needs a fact the contract does not
+  state, the contract has a gap and the fix belongs there, not here.
+
+  Usage: serve it next to the API (scripts/serve_reference_client_demo.py does
+  that with fake generation, zero quota), paste the X-API-Key, ask.
+-->
+<meta charset="utf-8">
+<title>mcrag reference client (disposable)</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+  input { font: inherit; padding: .3rem; }
+  #question { width: 24rem; }
+  #sources li { margin-bottom: .4rem; }
+  .stale { color: #a30; }
+  #answer { white-space: pre-wrap; margin: 1rem 0; }
+  #refusal { border-left: 3px solid #a30; padding-left: .8rem; }
+  #done { color: #555; font-size: 13px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #555; margin-bottom: .3rem; }
+</style>
+
+<p><b>Disposable reference client.</b> Proves the stream; not a front end.</p>
+<p>
+  <label>API key <input id="token" type="password" size="18"></label>
+  <input id="question" placeholder="Ask about Maryville College">
+  <button id="ask">Ask</button>
+  <button id="reset" title="Clears the client-held history">New conversation</button>
+</p>
+<p id="turns"></p>
+
+<h2>Sources <span id="rewritten"></span></h2>
+<ul id="sources"></ul>
+<h2>Answer</h2>
+<div id="answer"></div>
+<div id="refusal" hidden></div>
+<h2>Done</h2>
+<div id="done"></div>
+
+<script>
+// The client holds the conversation, because the server deliberately holds none
+// (Task 28): prior *user* turns only, oldest first -- never assistant text, which
+// the service regenerates itself rather than trusting a client's transcript of it.
+let history = [];
+let text = "";
+let cites = [];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Citations arrive as [start, end) offsets into the answer text accumulated so
+// far, so the client never re-parses prose to find what a citation covers --
+// it splices anchors at the offsets the server gave it.
+function renderAnswer() {
+  let out = "", at = 0;
+  for (const c of [...cites].sort((a, b) => a.claim_span[0] - b.claim_span[0])) {
+    const [s, e] = c.claim_span;
+    if (s < at) continue; // overlapping spans: first one wins, no nesting
+    out += esc(text.slice(at, s));
+    out += `<a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(text.slice(s, e))}</a>`;
+    at = e;
+  }
+  $("answer").innerHTML = out + esc(text.slice(at));
+}
+
+function handle(type, data) {
+  if (type === "sources") {
+    $("rewritten").textContent = data.rewritten_query ? `(retrieved on: "${data.rewritten_query}")` : "";
+    $("sources").innerHTML = data.chunks.map((c) => `<li>
+        <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title)}</a>
+        — ${esc(c.heading_path.join(" › "))}
+        <small>[${esc(c.silo.join(", "))}] verified ${esc(c.last_verified)}
+        ${c.stale ? '<span class="stale">(stale)</span>' : ""}
+        ${c.rerank_score === null ? "" : "score " + c.rerank_score}</small></li>`).join("");
+  } else if (type === "token") {
+    text += data.text;
+    renderAnswer();
+  } else if (type === "citation") {
+    cites.push(data);
+    renderAnswer();
+  } else if (type === "refusal") {
+    const r = $("refusal");
+    r.hidden = false;
+    r.innerHTML = `<p>No answer (<code>${esc(data.reason)}</code>). Contact
+      <a href="${esc(data.contact_url)}" target="_blank" rel="noopener">${esc(data.office)}</a>
+      — <a href="mailto:${esc(data.email)}">${esc(data.email)}</a></p>`;
+  } else if (type === "done") {
+    $("done").textContent =
+      `${data.refused ? "refused" : "answered"} · schema ${data.schema_version} · ` +
+      Object.entries(data.latency_ms).map(([k, v]) => `${k}=${v === null ? "—" : Math.round(v)}`).join(" ");
+  }
+}
+
+async function ask() {
+  const question = $("question").value.trim();
+  if (!question) return;
+  for (const el of ["sources", "answer", "done"]) $(el).innerHTML = "";
+  $("refusal").hidden = true;
+  $("rewritten").textContent = "";
+  text = ""; cites = [];
+
+  const resp = await fetch("/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": $("token").value },
+    body: JSON.stringify({ question, history }),
+  });
+  if (!resp.ok) { $("done").textContent = `HTTP ${resp.status}`; return; }
+
+  // Hand-rolled SSE parse, not EventSource: EventSource is GET-only and cannot
+  // set the X-API-Key header the service requires (Task 25).
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      const type = /^event: (.+)$/m.exec(frame)?.[1];
+      const data = /^data: (.+)$/m.exec(frame)?.[1];
+      if (type && data) handle(type, JSON.parse(data));
+    }
+  }
+
+  history.push(question);
+  $("turns").textContent = `history: ${history.length} prior turn(s) — ${history.join(" | ")}`;
+  $("question").value = "";
+}
+
+$("ask").onclick = ask;
+$("question").onkeydown = (e) => { if (e.key === "Enter") ask(); };
+$("reset").onclick = () => { history = []; $("turns").textContent = ""; };
+</script>

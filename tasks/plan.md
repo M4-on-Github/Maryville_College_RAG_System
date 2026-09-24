@@ -1212,14 +1212,16 @@ works and demoing. **A test fixture, not a product.** When the real front end is
 decided it is a new client against a frozen contract.
 
 **Acceptance criteria:**
-- [ ] Renders every event type, sources first
-- [ ] Inline citation links to live source URLs
-- [ ] Refusal renders the office contact
-- [ ] File header states plainly that it is disposable, so nobody grows a product on it
+- [x] Renders every event type, sources first — `clients/reference_client.html`: `sources` (title link, heading trail, silo, `last_verified`, a `stale` badge, `rewritten_query` when non-null), `token` (appended, re-rendered), `citation`, `refusal`, `done` (per-stage `latency_ms`, `refused`, `schema_version`); a `null` stage prints `—`, never `0`
+- [x] Inline citation links to live source URLs — the client splices an `<a href>` at the `claim_span` offsets the server sent, so it never re-parses prose to find what a citation covers; overlapping spans resolve first-wins rather than nesting
+- [x] Refusal renders the office contact — `office` as a link to `contact_url` plus a `mailto:` for `email`, and the `reason` verbatim; no prose is parsed to find any of it
+- [x] File header states plainly that it is disposable, so nobody grows a product on it — the file opens with `DISPOSABLE REFERENCE CLIENT. NOT A PRODUCT. DO NOT BUILD ON THIS.` and says outright that the real front end is a *new* client against `docs/stream_contract.md`, and that this file should be deleted then
 
-**Verification:** Manual — ask three questions including one refusal.
+**Verification:** Manual, at zero generation quota. `scripts/serve_reference_client_demo.py` stands up the real `create_app` + real `answer()` + real event models + real SSE framing with only the paid/on-disk leaves faked (the doubles `tests/test_service.py` already defines, imported rather than re-invented, as `tests/test_api.py` does), and the *real* free `HistoryConcatenationReformulator` so `rewritten_query` is genuinely non-null on a follow-up. Three questions over that server: "What is the deposit?" → `sources`(2 chunks, one deliberately 2024-crawled so `stale: true` renders) · `token` · `citation` · `done`; a follow-up with `history` → `rewritten_query: "What is the deposit? When is it due?"`; anything mentioning parking → `sources` · `refusal`(`reason: model`, routed to Admissions) · `done` with no `token` at all. Frame-by-frame SSE output captured for all three. Rendering itself was then checked by extracting the client's `handle()` and driving it with those exact captured payloads under a stubbed DOM (`node`) — citation spliced at the server's offsets, `stale` badge, `rewritten_query`, office `mailto:`, `reform=—` for a null stage, and server-supplied HTML escaped rather than injected. **Not done:** opening it in a real browser (the Chrome extension is not connected in this session) and any live `gemma4:31b` answer — flagged open, same convention as T24/T25/T26's deferred real-quota checks.
 
 **Dependencies:** T26 · **Scope:** S
+
+**Resolution:** done 2026-09-23. **No product code changed for this task** — `clients/reference_client.html` and `scripts/serve_reference_client_demo.py` are both new files, and nothing under `mcrag/` was touched, which is the strongest available evidence that the contract really is the whole client surface. Two deliberate choices: the client hand-rolls SSE parsing over `fetch` rather than using `EventSource`, because `EventSource` is GET-only and cannot set the `X-API-Key` header T25 requires (worth knowing before a real front end is designed); and the render harness used to verify it was left in the scratchpad rather than committed as a test, because a permanent test suite around a file whose header says *delete me* is exactly the kind of growth the disposability warning exists to prevent. The client holds the conversation itself — prior user turns only, oldest first — matching T28's statelessness rather than inventing a session id the server would ignore.
 
 ### ✅ Checkpoint F — backend complete
 - [ ] Contract frozen and documented; a second client could be written from the doc alone
