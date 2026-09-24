@@ -158,13 +158,31 @@ escaped. Layers 2 to 4 are the only ones the model-level test exercises.
   the model was called. The same gate also refused two legitimate questions
   ("tuition deposit for new students", "who do I contact about financial aid"),
   the cost recorded in `decisions/0009` and `decisions/0010`.
-- **Sources-before-tokens timing claim not met.** Gap between `sources` and first
-  `token` over three answered warm calls: 0.65 s, 1.07 s, 0.63 s. The claim is
-  "at least 1 s", so it held for 1 of 3. The first request after start took 15.6 s
-  (cold model load).
-- **Answers arrive in one piece.** `token`, `citation` and `done` land within
-  about 0.05 s of each other, so the SSE stream is not incremental token
-  streaming as observed.
+- **Sources-before-tokens timing claim not met (T42).** Gap between `sources` and the
+  first `token` over 6 warm answered calls, after a discarded warm-up: 0.796, 0.989,
+  1.202, 0.660, 1.105, 0.911 s. **Median 0.950 s; 2 of 6 reached 1 s.** Three earlier
+  calls over HTTP gave 0.65, 1.07, 0.63 s. The "at least 1 s" claim is **not
+  supported**, and the spread (0.66 to 1.20 s on the same three questions) is cloud
+  latency noise, so no threshold claim of this shape can be made at this n. The
+  measured, defensible claim is the ordering one, which is a tested design property:
+  `sources` is emitted before generation is requested at all.
+- **Answers are delivered in one piece, by design (T42).** Cause, located in code:
+  `mcrag/service/answer.py` collects every token into `visible`, classifies the
+  complete text with the refusal classifier, and only then replays the tokens as
+  `TokenEvent`s. The model-level refusal check cannot run on a partial answer, and a
+  token already sent cannot be recalled, so **incremental streaming and answer-level
+  refusal are in direct conflict** and this service chose refusal. Measured
+  confirmation: one call produced 183 separate `token` events spanning 0.001 s, while
+  the generator itself, measured directly, does stream (64 to 66 token events spread
+  over 0.32 to 0.43 s, with and without gzip). So the buffering is ours, not the
+  provider's. Consequence: the `sources`-to-first-token gap above is really the time
+  to generate the *whole* answer, not time-to-first-token.
+  A candidate fix, **not implemented and not validated**: classify on a prefix (the
+  live misses all opened with the refusal wording) and stream the remainder. That needs
+  its own pre-registered arm, since a prefix that misclassifies leaks a refused answer.
+- **Retrieval, not generation, owns the cold start.** On a fresh pipeline the first
+  call's `sources` took 22.3 s, the next 0.224 s (model/index warm-up). Over HTTP the
+  first request took 15.6 s. Every number above is from warm calls.
 
 ## What actually moved the numbers
 

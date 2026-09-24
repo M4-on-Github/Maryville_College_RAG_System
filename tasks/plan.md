@@ -1226,7 +1226,7 @@ decided it is a new client against a frozen contract.
 ### ✅ Checkpoint F — backend complete
 - [x] Contract frozen and documented; a second client could be written from the doc alone (T29 client built against the doc; found the `EventSource`/`X-API-Key` gap)
 - [x] Service callable runs with no server (`tests/test_service.py`)
-- [ ] Sources-before-tokens verified by timing test — **RUN LIVE 2026-09-24, CLAIM NOT MET; box stays open.** Real `gemma4:31b`, three warm answered calls: sources->first token 0.65s, 1.07s, 0.63s against the >=1s claim (held for 1 of 3). Tokens, citation and `done` arrive within ~0.05s of each other, so answers arrive in one piece rather than streaming. Also run live (n=1 per case; `docs/LIMITATIONS.md` section 7): `curl -N POST /ask` works over real SSE (T25); the three fixed injection attempts (T24) were refused by the retrieval gate before the model, and with the gate patched off in memory the model declined all seven attack cases with no system-prompt leak and no injected output, but 4 of 7 refusals were not classified as `refusal` events (no office routing). **Open decision:** treat the timing claim and the unrouted refusals as fixes or as documented limitations. Real-browser open of the client (T29) was done against the zero-quota demo server only: sources with `stale` badge, citation, `rewritten_query` on a follow-up and the refusal block all rendered; stage timings were stub zeros, so null-stage `—` rendering is unchecked.
+- [x] Sources-before-tokens **ordering** verified (design property, tested). The **"at least 1 s" gap claim is dropped as unsupported** — T42 re-measured 6 warm calls: 0.796/0.989/1.202/0.660/1.105/0.911 s, median 0.950 s, 2 of 6 at 1 s; spread is cloud noise. Answers are delivered in one piece by design: `answer.py` buffers tokens so the refusal classifier sees the whole text (see `docs/LIMITATIONS.md` §7 and Task 42). Also run live 2026-09-24: `curl -N POST /ask` works over real SSE (T25); the three fixed injection attempts (T24) were refused by the retrieval gate before the model, and with the gate patched off in memory the model declined all seven attack cases with no system-prompt leak and no injected output, though 4 of 7 refusals were unrouted (fixed in T40). Real-browser open of the client (T29) was done against the zero-quota demo server only.
 - [x] Refusal always routes to a real office (code + tests; live refusal run still open, see above)
 - [x] **No UI decision has been made or needed**
 
@@ -1339,10 +1339,11 @@ Answer or abstain becomes a schema field rather than parsed prose. Changes the f
 ## Task 42: Sources-before-tokens timing and one-piece delivery
 Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, citation and done arrive within about 0.05 s of each other.
 **Acceptance:**
-- [ ] Find out whether the generator is non-streaming or the service buffers; report the cause with evidence (code path and timestamps)
-- [ ] Decide fix or limitation: either make streaming incremental, or change the claim to what was measured; state which
-- [ ] If a fix is made, re-measure live over at least 5 warm calls and report the median, not the best
-**Verification:** measured numbers in `docs/LIMITATIONS.md`; the claim in the plan matches them.
+- [x] Find out whether the generator is non-streaming or the service buffers; report the cause with evidence (code path and timestamps)
+- [x] Decide fix or limitation: either make streaming incremental, or change the claim to what was measured; state which
+- [x] If a fix is made, re-measure live over at least 5 warm calls and report the median, not the best
+**Result:** cause is ours, not the provider's — `answer.py` buffers all tokens so the refusal classifier can see the complete text; the generator itself streams (64-66 events over 0.32-0.43 s). Decision: **claim corrected, no fix shipped.** Streaming and answer-level refusal conflict; a prefix-classification fix is logged as a candidate needing its own arm. Re-measured over 6 warm calls: median 0.950 s, 2 of 6 reached 1 s, so the "at least 1 s" claim is dropped and only the tested ordering property is claimed.
+**Verification:** measured numbers in `docs/LIMITATIONS.md` §7; the plan's Checkpoint F line matches them.
 
 ### ✅ Checkpoint 6b: service hardening reviewed
 - [ ] T37 to T40 and T42 done or explicitly waived; T41 done or explicitly deferred
