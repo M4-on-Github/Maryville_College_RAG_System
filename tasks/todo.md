@@ -58,7 +58,7 @@ Design rationale lives in `PLAN.md`.
 ## Phase 6 — Portfolio
 - [x] T30 · Results table generator from `runs/` (M) — cost column (median wall_s), 3a/3c control markers, deterministic SVG Pareto frontier; byte-identical regeneration verified
 - [x] T31 · Architecture diagram + README (S) — clean-clone setup verified; README gaps fixed
-- [ ] T32 · Limitations + writeup (M)
+- [x] T32 · Limitations + writeup (M) — `docs/LIMITATIONS.md`
 - [ ] T33 · Recorded demo walkthrough (S)
 - [ ] **Checkpoint G** — shipped
 

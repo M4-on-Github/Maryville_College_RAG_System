@@ -92,6 +92,7 @@ refuse rather than guess.
 | `tasks/todo.md` | The backlog |
 | `decisions/` | Decisions made once and not relitigated |
 | `RESULTS.md` | Generated from `runs/`, never hand-edited |
+| `docs/LIMITATIONS.md` | What the results cannot show, what moved the numbers, the test-split access log |
 
 ## Development conventions
 
@@ -137,7 +138,6 @@ ablation table, not the demo, is the centerpiece.
 
 ## Status
 
-Backend complete through Checkpoint F. Not yet done: the limitations write-up
-(T32), the recorded demo (T33), and live-quota checks of the streaming timing
+Backend complete through Checkpoint F. Not yet done: the recorded demo (T33), and live-quota checks of the streaming timing
 claim, prompt-injection refusals and a real-browser pass on the reference client,
 which are recorded as open in `tasks/plan.md` rather than claimed.

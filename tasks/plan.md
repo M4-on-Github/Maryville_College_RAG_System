@@ -1261,10 +1261,10 @@ decided it is a new client against a frozen contract.
 ## Task 32: Limitations + writeup
 
 **Acceptance criteria:**
-- [ ] Self-authored eval set, author-is-designer blind spots, cloud attributability-not-reproducibility, single-model abstention — each stated plainly, **not buried in footnotes**
-- [ ] Judge-human agreement number reported if a Tier 3 judge was used (§4d)
-- [ ] Test-split access log reproduced verbatim
-- [ ] What actually moved the numbers, including what did not
+- [x] Self-authored eval set, author-is-designer blind spots, cloud attributability-not-reproducibility, single-model abstention — each stated plainly, **not buried in footnotes**
+- [x] Judge-human agreement number reported if a Tier 3 judge was used (§4d) — κ = 0.146, judge dropped
+- [x] Test-split access log reproduced verbatim (from `notes.md`)
+- [x] What actually moved the numbers, including what did not (`docs/LIMITATIONS.md`)
 
 **Dependencies:** T30 · **Scope:** M
 
