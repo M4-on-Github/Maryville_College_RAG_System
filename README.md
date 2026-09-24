@@ -146,7 +146,11 @@ which **failed its claim**, so the "sources arrive at least 1 s before the first
 token" claim was dropped rather than fixed, and only the tested ordering property
 is claimed (`docs/LIMITATIONS.md` §7).
 
-Not yet done: the recorded demo (T33), the structured-refusal A/B (T41, deferred
-because it spends quota and changes a frozen prompt), and Phase 7 maintenance.
+The structured-refusal A/B (T41) has since been run on dev and **rejected**
+(`decisions/0017`): the model emits the `DECISION:` field reliably and it catches
+every out-of-scope case, but the prompt that produces it suppresses partial answers,
+so the frozen prompt stands unchanged.
+
+Not yet done: the recorded demo (T33) and Phase 7 maintenance.
 The reference client's real-browser pass covered the zero-quota demo server only.
 Everything open is recorded in `tasks/plan.md` rather than claimed.

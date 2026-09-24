@@ -75,9 +75,12 @@ class DecisionFieldClassifier:
     inferring refusal from prose. Falls back to `fallback` when the line is absent,
     because a protocol violation must not silently become "did not refuse".
 
-    **Wired nowhere by default.** It is only correct with
-    `DECISION_FIELD_SYSTEM_PROMPT`, and whether that prompt ships is decided by the
-    T41 arm, not by this class existing.
+    **Wired nowhere, and staying that way.** It is only correct with
+    `DECISION_FIELD_SYSTEM_PROMPT`, and that prompt was **rejected** by the T41 dev
+    A/B (decisions/0017): the field itself is reliable (0/60 protocol violations,
+    12/12 out-of-scope caught against the shipped classifier's 8/12), but the prompt
+    that produces it suppresses partial answers. Kept for the record, like the
+    rejected v1-v3 classifiers above.
     """
 
     def __init__(self, fallback: RefusalClassifier | None = None) -> None:

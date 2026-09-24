@@ -67,7 +67,7 @@ Design rationale lives in `PLAN.md`.
 - [x] T38 · Escape delimiter tokens in user text (S) — free
 - [x] T39 · Injection regression suite, stubbed + live report (M)
 - [x] T40 · Service refusal classifier, offline replay (M) — free, dev/train only
-- [ ] T41 · Structured decision field for refusal (M) — **live quota, needs go-ahead** — **deferred, awaiting go-ahead**
+- [x] T41 · Structured decision field for refusal (M) — ran on go-ahead, 180 dev calls — **rejected** (`decisions/0017`): field reliable (0/60 violations) and 12/12 on out-of-scope, but it suppresses partial answers; `cross_silo` −0.500 [−0.786, −0.214]. Frozen prompt unchanged.
 - [x] T42 · Sources-before-tokens timing and one-piece delivery (S)
 - [x] **Checkpoint 6b** — service hardening reviewed
 

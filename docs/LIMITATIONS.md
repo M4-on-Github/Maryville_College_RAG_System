@@ -135,7 +135,7 @@ exercises layers 3 to 5 only):
 | 2 | Retrieval-score gate, `TAU=4.96` (`decisions/0009`) | Caught 16 of 16 T39 cases before the model, at zero quota | Over-refuses: 3 of those 16 were genuine questions, and it refuses real questions generally |
 | 3 | Fixed `SERVICE_SYSTEM_PROMPT` | Override, disclosure and role-play, by instruction; held on all 16 cases with the gate off | Tuned for `gemma4:31b` only; prompt-only abstention is known to be weak under misleading context |
 | 4 | `DelimiterEscaper` (T38) | Forged `<question>`/`<passages>` tags; the passage-forgery case had no effect | Paraphrased instructions, which carry no delimiters |
-| 5 | `NarrowPhraseClassifier` (T40, `decisions/0016`) | Routes a refusal-shaped reply to a `refusal` event with office contact; 16 of 16 routed live | Wording-based, post-hoc, validated at n=4 plus zero dev regressions |
+| 5 | `NarrowPhraseClassifier` (T40, `decisions/0016`) | Routes a refusal-shaped reply to a `refusal` event with office contact; 16 of 16 routed live | Wording-based, post-hoc, validated at n=4 plus zero dev regressions. **Measured blind spot (T41): on 12 out-of-scope dev questions it saw 8 refusals where the model's own decision field saw 12** |
 | 6 | Stateless service, history = prior user turns only | No server-side state to poison across requests | The client supplies history, so a client can forge it |
 | 7 | No tools, read-only corpus | There is nothing to hijack: no sending, writing, or spending. The largest structural win | Nothing, but it is why agent-style defences (CaMeL-style) are out of scope here |
 
@@ -206,6 +206,33 @@ per case, n=1.
   A candidate fix, **not implemented and not validated**: classify on a prefix (the
   live misses all opened with the refusal wording) and stream the remainder. That needs
   its own pre-registered arm, since a prefix that misclassifies leaks a refused answer.
+- **Asking the model to label its own refusal works; the prompt that does it costs
+  answers (T41, `decisions/0017`).** 180 live dev calls, three interleaved arms. The
+  `DECISION: ANSWER|ABSTAIN` field was emitted well-formed **60 out of 60 times**, and
+  on `out_of_scope` it caught **12 of 12** where the shipped classifier caught 8 —
+  `refusal_correct` +0.333 [+0.083, +0.583] on that slice, against a noise floor of
+  exactly zero. **Rejected anyway:** pooled `refusal_correct` −0.083 [−0.200, +0.033]
+  and `cross_silo` **−0.500 [−0.786, −0.214]**. Committing to `ABSTAIN` on line one
+  stops the model writing the partial answer the adopted prompt gives; median
+  completion tokens fell 63.5 → 53.5, and hand triage of the 12 in-scope abstentions
+  found 5 that lost substantive content the control supplied (named contacts, a policy
+  with its source, a GPA requirement table) and one labelled `ABSTAIN` over a body that
+  did answer. So the layer-5 blind spot is now **measured**, and this is not the fix.
+- **`refusal_correct` cannot distinguish "answered" from "refused invisibly".** Falling
+  out of T41: replaying the broad `passages do not contain` pattern offline over both
+  arms puts in-scope prose refusals at 5 (decision-field) vs 4 (control) — nearly
+  identical — while the shipped classifier scores them 12 vs 3. Much of the pooled gap
+  is the control being *credited with answering* on questions where it refused in prose
+  the classifier cannot see. Paired differences between arms scored the same way stay
+  meaningful; the absolute number is softer than it looks. Fixing it needs human
+  refusal labels on dev answers, which this project does not have. Compounds the T40
+  finding about the frozen eval classifier below.
+- **The endpoint was deterministic on this run, which is not a licence to stop pairing.**
+  T41's two identical control passes agreed on the refusal decision for **60/60**
+  questions and produced byte-identical text for 38/60 (faithfulness floor ±0.026,
+  tokens ±5). At temperature 0 the refusal decision was perfectly stable *this session*.
+  One session is not evidence about the endpoint in general, and a zero-width noise
+  floor leaves an adopt rule keyed to it with nothing to clear, so the CI did that work.
 - **Retrieval, not generation, owns the cold start.** On a fresh pipeline the first
   call's `sources` took 22.3 s, the next 0.224 s (model/index warm-up). Over HTTP the
   first request took 15.6 s. Every number above is from warm calls.

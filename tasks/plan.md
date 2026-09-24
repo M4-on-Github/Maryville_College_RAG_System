@@ -1331,11 +1331,22 @@ The eval classifier `looks_like_a_refusal` stays frozen so historical `refusal_c
 ## Task 41: Structured decision field for refusal (live quota)
 Answer or abstain becomes a schema field rather than parsed prose. Changes the frozen prompt of `decisions/0014`, so it is an A/B and not a swap.
 **Acceptance:**
-- [ ] **Waits for an explicit go-ahead**, because it spends generation quota and touches a frozen prompt
-- [ ] Arms pre-registered: control = current prompt + T40 winner; arm = structured `decision` field; noise-floor rerun of the control beside it
-- [ ] Dev only. Report refusal_correct, out-of-scope answered count, Tier 1 faithfulness, and cost as a median, each with CI and against the noise floor
-- [ ] Adopted only if it clears the noise floor; otherwise logged as rejected
-**Verification:** run dirs with config, split hash and model lock; decisions doc with every arm.
+- [x] **Waits for an explicit go-ahead**, because it spends generation quota and touches a frozen prompt
+- [x] Arms pre-registered: control = current prompt + T40 winner; arm = structured `decision` field; noise-floor rerun of the control beside it
+- [x] Dev only. Report refusal_correct, out-of-scope answered count, Tier 1 faithfulness, and cost as a median, each with CI and against the noise floor
+- [x] Adopted only if it clears the noise floor; otherwise logged as rejected
+**Result:** **rejected** (`decisions/0017`), 180 live dev calls. The field is emitted
+reliably — 0/60 protocol violations — and on `out_of_scope` it catches 12/12 where the
+shipped classifier catches 8/12 (+0.333 [+0.083, +0.583]), so the layer-5 blind spot is
+real. But committing to `ABSTAIN` on line one changes what the model writes next: it
+drops the partial answer the adopted prompt gives. Pooled `refusal_correct` −0.083
+[−0.200, +0.033], `cross_silo` **−0.500 [−0.786, −0.214]**, median completion tokens
+53.5 vs 63.5. Hand triage of the 12 in-scope abstentions: 7 were prose refusals in the
+control too, 5 lost substantive content, 1 labelled ABSTAIN over a body that answered.
+Criterion 1 fails; the frozen prompt stays as `decisions/0014` left it. Noise floor was
+exactly zero (60/60 identical refusal decisions across the two control passes).
+Follow-ups logged, not run: suffix field, three-valued `ANSWER|PARTIAL|ABSTAIN`.
+**Verification:** `runs/20260924T140930Z_{663bed2da821,9b1a6dd804d0,ef32c7a015e1}` with config, corpus/model/split locks; `runs/t41_decision_field_analysis.json`; `decisions/0017` lists every arm and why the candidate lost.
 
 ## Task 42: Sources-before-tokens timing and one-piece delivery
 Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, citation and done arrive within about 0.05 s of each other.
@@ -1347,7 +1358,7 @@ Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, c
 **Verification:** measured numbers in `docs/LIMITATIONS.md` §7; the plan's Checkpoint F line matches them.
 
 ### ✅ Checkpoint 6b — service hardening reviewed
-- [x] T37, T38, T39, T40, T42 done; **T41 deferred** — it spends generation quota and changes a frozen prompt, so it waits for an explicit go-ahead
+- [x] T37, T38, T39, T40, T42 done; **T41 ran later on an explicit go-ahead and was rejected** (`decisions/0017`) — the frozen prompt is unchanged, so nothing below this line moved
 - [x] `docs/LIMITATIONS.md` section 7 updated to what the new numbers say
 - [x] Layer table (7 layers) states what each layer now covers and does not
 - [x] Full suite 710 passed after the phase (628 before it)

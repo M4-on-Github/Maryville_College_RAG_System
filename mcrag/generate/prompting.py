@@ -102,6 +102,13 @@ ANSWERABILITY_CHECK_SYSTEM_PROMPT = (
 # Additive: SCOPE_STRICT_SYSTEM_PROMPT is untouched, and this is a pre-registered
 # A/B arm against it (decisions/0014's adopted config), not a replacement.
 # `mcrag.generate.decision_field` parses what this asks for.
+#
+# **REJECTED, kept for the record (decisions/0017).** The 180-call dev A/B found the
+# field is emitted reliably (0/60 violations) and catches 12/12 out-of-scope cases,
+# but committing to ABSTAIN on line one changes what the model writes next: it drops
+# the partial answer the adopted prompt gives ("here is what the passages do say, and
+# here is the gap"). `cross_silo` refusal_correct fell 0.500 [0.214, 0.786]. Not
+# wired anywhere.
 DECISION_FIELD_SYSTEM_PROMPT = (
     SCOPE_STRICT_SYSTEM_PROMPT
     + " Format your reply as follows. The first line must be exactly "
