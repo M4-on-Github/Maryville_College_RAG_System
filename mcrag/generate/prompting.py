@@ -125,6 +125,15 @@ DECISION_FIELD_SYSTEM_PROMPT = (
 # partial answer the adopted prompt gives; here it writes first and labels what it
 # wrote. The "partial answer counts as ANSWER" clause is deliberate -- it resolves the
 # one T41 case whose ABSTAIN label sat over a body that did answer.
+#
+# **ALSO REJECTED, kept for the record (decisions/0018).** The fix worked on its own
+# terms -- 0 content losses in triage against T41's 5, completion tokens +16.12
+# [+5.27, +25.32], cross_silo back from -0.500 to -0.143, out-of-scope answered 0/12
+# against the control's 3/12, 0/60 violations -- but pooled refusal_correct came to
+# +0.033 [-0.050, +0.133], a net 2 flips in 60 with a CI containing zero, at +16 tokens
+# an answer. 3 in-scope partial answers were labelled ABSTAIN anyway, the inverse of
+# T41's failure. Two variants is what the decisions/0011 stopping rule allows, so the
+# labelling route is closed and SCOPE_STRICT_SYSTEM_PROMPT remains what ships.
 SUFFIX_DECISION_FIELD_SYSTEM_PROMPT = (
     SCOPE_STRICT_SYSTEM_PROMPT
     + " Write your reply first, in full, exactly as described above. Then close it "

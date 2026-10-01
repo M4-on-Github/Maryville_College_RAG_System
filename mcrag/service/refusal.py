@@ -97,6 +97,15 @@ class SuffixDecisionFieldClassifier:
     """T41b (decisions/0018): reads a *trailing* `DECISION:` line. Same fallback
     contract as `DecisionFieldClassifier` -- a protocol violation must not silently
     become "did not refuse". Only correct with `SUFFIX_DECISION_FIELD_SYSTEM_PROMPT`.
+
+    **Wired nowhere, and staying that way.** The suffix prompt was also **rejected**
+    (decisions/0018). It fixed what T41 broke -- 0 content losses against T41's 5,
+    +16 completion tokens rather than -10, cross_silo -0.500 -> -0.143 -- and it never
+    answered an out-of-scope question (0/12 against the control's 3/12) with 0/60
+    protocol violations. It lost on the pre-registered primary: pooled refusal_correct
+    +0.033 [-0.050, +0.133], 2 net question flips in 60. Per the decisions/0011
+    stopping rule this was the second and last variant of answer-level labelling, so
+    layer 5 ships as `NarrowPhraseClassifier` with its blind spot documented.
     """
 
     def __init__(self, fallback: RefusalClassifier | None = None) -> None:

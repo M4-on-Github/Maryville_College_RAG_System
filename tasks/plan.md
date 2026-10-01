@@ -1348,6 +1348,43 @@ exactly zero (60/60 identical refusal decisions across the two control passes).
 Follow-ups logged, not run: suffix field, three-valued `ANSWER|PARTIAL|ABSTAIN`.
 **Verification:** `runs/20260924T140930Z_{663bed2da821,9b1a6dd804d0,ef32c7a015e1}` with config, corpus/model/split locks; `runs/t41_decision_field_analysis.json`; `decisions/0017` lists every arm and why the candidate lost.
 
+## Task 41b: Suffix decision field (live quota)
+T41's follow-up, pre-registered separately in `decisions/0018`: the same label at the
+**end** of the reply, so the model writes the answer first and labels what it wrote.
+Attacks the one mechanism T41's triage identified, and is the **last** variant of the
+labelling idea under the `decisions/0011` stopping rule.
+**Acceptance:**
+- [x] **Waits for an explicit go-ahead** (given 2026-09-24; run completed 2026-09-30)
+- [x] Pre-registered before the first call, with a **fifth** criterion gating content loss — the thing T41 failed
+- [x] Arms: candidate, control = adopted config, noise-floor rerun of the control
+- [x] Dev only. Every pre-registered metric reported with CI against the noise floor; no p-value on dev
+- [x] The hand triage of in-scope abstentions produced **by the run**, not post-hoc
+- [x] Adopted only if all five criteria hold; otherwise logged as rejected
+**Result:** **rejected** (`decisions/0018`), 180 live dev calls, on criterion 1 alone —
+criteria 2-5 all pass. The variant did what it was built to do: **0 content losses** in
+the triage against T41's 5, `completion_tokens` **+16.12 [+5.27, +25.32]** rather than
+T41's loss, `cross_silo` recovered from −0.500 to −0.143 [−0.429, +0.143], out-of-scope
+answered **0/12** against the control's 3/12, protocol violations 0/60, faithfulness up
+0.048. But the primary, pooled `refusal_correct[shipped]`, is **+0.033 [−0.050, +0.133]**
+— a CI containing zero, and a net of only **2 question flips in 60** (+3 `out_of_scope`,
++1 `multi_turn`, −2 `cross_silo`). The 3 in-scope mislabels are the inverse of T41's
+failure: a partial answer labelled `ABSTAIN`, which the prompt's own "answers even
+partly → ANSWER" clause was written to prevent. Finding, stated as a finding and not
+just a verdict: **self-labelling fixes the out-of-scope blind spot and opens an in-scope
+one of comparable size.** Frozen prompt unchanged; per the stopping rule the
+answer-level labelling route is now **closed**.
+**Deviation, logged:** the 180 calls span two sessions — the 2026-09-24 batch was killed
+by the harness at 53/60 per arm for system memory pressure, and T17 resumability
+appended the remaining 7 per arm on 2026-09-30 rather than starting fresh dirs. Arms
+stopped and resumed at the same boundary with identical qid sets, so cross-arm pairing
+(`decisions/0010`) holds; model-drift quarantine was 0/60 in all three arms; and the 7
+tail questions sit in the two slices that came out at exactly 0.000, so the verdict does
+not rest on them.
+**Verification:** `runs/20260924T143258Z_{b8758fe076af,a5f129337e5f,2e5268506548}` with
+config, corpus/model/split locks and a `PROVENANCE.txt` recording the two-session write;
+`runs/t41b_suffix_field_analysis.json`; `docs/t41b_abstain_triage.md`; `decisions/0018`
+scores all five criteria and classifies all five abstentions.
+
 ## Task 42: Sources-before-tokens timing and one-piece delivery
 Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, citation and done arrive within about 0.05 s of each other.
 **Acceptance:**
@@ -1358,7 +1395,7 @@ Live check: gap 0.65 s, 1.07 s, 0.63 s against a claim of at least 1 s; token, c
 **Verification:** measured numbers in `docs/LIMITATIONS.md` §7; the plan's Checkpoint F line matches them.
 
 ### ✅ Checkpoint 6b — service hardening reviewed
-- [x] T37, T38, T39, T40, T42 done; **T41 ran later on an explicit go-ahead and was rejected** (`decisions/0017`) — the frozen prompt is unchanged, so nothing below this line moved
+- [x] T37, T38, T39, T40, T42 done; **T41 and T41b both ran later on explicit go-aheads and were both rejected** (`decisions/0017`, `decisions/0018`) — the frozen prompt is unchanged, so nothing below this line moved. The labelling route is closed by the `decisions/0011` stopping rule, with the layer-5 blind spot measured and documented rather than patched
 - [x] `docs/LIMITATIONS.md` section 7 updated to what the new numbers say
 - [x] Layer table (7 layers) states what each layer now covers and does not
 - [x] Full suite 710 passed after the phase (628 before it)

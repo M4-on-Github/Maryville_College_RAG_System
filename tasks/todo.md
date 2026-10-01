@@ -68,6 +68,7 @@ Design rationale lives in `PLAN.md`.
 - [x] T39 · Injection regression suite, stubbed + live report (M)
 - [x] T40 · Service refusal classifier, offline replay (M) — free, dev/train only
 - [x] T41 · Structured decision field for refusal (M) — ran on go-ahead, 180 dev calls — **rejected** (`decisions/0017`): field reliable (0/60 violations) and 12/12 on out-of-scope, but it suppresses partial answers; `cross_silo` −0.500 [−0.786, −0.214]. Frozen prompt unchanged.
+- [x] T41b · Suffix decision field (M) — ran on go-ahead, 180 dev calls — **rejected** (`decisions/0018`) on criterion 1 only; criteria 2-5 pass. Fixed what T41 broke (0 content losses vs 5, tokens +16.12 [+5.27, +25.32], `cross_silo` −0.500 → −0.143) and kept the out-of-scope win (0/12 answered vs 3/12), but pooled `refusal_correct` +0.033 [−0.050, +0.133] — 2 net flips in 60. Labelling route **closed** (`decisions/0011`). Frozen prompt unchanged.
 - [x] T42 · Sources-before-tokens timing and one-piece delivery (S)
 - [x] **Checkpoint 6b** — service hardening reviewed
 

@@ -135,7 +135,7 @@ exercises layers 3 to 5 only):
 | 2 | Retrieval-score gate, `TAU=4.96` (`decisions/0009`) | Caught 16 of 16 T39 cases before the model, at zero quota | Over-refuses: 3 of those 16 were genuine questions, and it refuses real questions generally |
 | 3 | Fixed `SERVICE_SYSTEM_PROMPT` | Override, disclosure and role-play, by instruction; held on all 16 cases with the gate off | Tuned for `gemma4:31b` only; prompt-only abstention is known to be weak under misleading context |
 | 4 | `DelimiterEscaper` (T38) | Forged `<question>`/`<passages>` tags; the passage-forgery case had no effect | Paraphrased instructions, which carry no delimiters |
-| 5 | `NarrowPhraseClassifier` (T40, `decisions/0016`) | Routes a refusal-shaped reply to a `refusal` event with office contact; 16 of 16 routed live | Wording-based, post-hoc, validated at n=4 plus zero dev regressions. **Measured blind spot (T41): on 12 out-of-scope dev questions it saw 8 refusals where the model's own decision field saw 12** |
+| 5 | `NarrowPhraseClassifier` (T40, `decisions/0016`) | Routes a refusal-shaped reply to a `refusal` event with office contact; 16 of 16 routed live | Wording-based, post-hoc, validated at n=4 plus zero dev regressions. **Measured blind spot (T41/T41b): on 12 out-of-scope dev questions it saw 8 refusals where the model's own decision field saw 12. Two pre-registered attempts to replace it with a self-reported field were both rejected, so it ships as-is** |
 | 6 | Stateless service, history = prior user turns only | No server-side state to poison across requests | The client supplies history, so a client can forge it |
 | 7 | No tools, read-only corpus | There is nothing to hijack: no sending, writing, or spending. The largest structural win | Nothing, but it is why agent-style defences (CaMeL-style) are out of scope here |
 
@@ -218,6 +218,32 @@ per case, n=1.
   found 5 that lost substantive content the control supplied (named contacts, a policy
   with its source, a GPA requirement table) and one labelled `ABSTAIN` over a body that
   did answer. So the layer-5 blind spot is now **measured**, and this is not the fix.
+- **Moving the label to the end fixes the cost and still does not clear the bar
+  (T41b, `decisions/0018`).** The follow-up T41 logged, pre-registered separately and run
+  as another 180 live dev calls with a fifth criterion gating content loss. It worked on
+  exactly the mechanism T41's triage blamed: **0** content losses in the hand triage
+  against T41's 5, `completion_tokens` **+16.12 [+5.27, +25.32]** instead of a loss,
+  `cross_silo` back from −0.500 to −0.143 [−0.429, +0.143], out-of-scope answered **0/12**
+  against the control's 3/12, 0/60 protocol violations, faithfulness up 0.048. **Rejected
+  on the primary:** pooled `refusal_correct` **+0.033 [−0.050, +0.133]** — a net of 2
+  question flips in 60, CI containing zero, at +16 tokens per answer. The 3 in-scope
+  mislabels are T41's failure inverted: a partial answer that notes a gap, labelled
+  `ABSTAIN` despite a prompt clause written to prevent exactly that. The finding worth
+  keeping is narrower than "labelling does not work": **self-labelling fixes the
+  out-of-scope blind spot and opens an in-scope one of comparable size** — the model is
+  better at noticing it has nothing to say than at noticing that what it just wrote was
+  an answer. Two attempts is what the `decisions/0011` stopping rule allows, so layer 5
+  stays as T40 left it.
+- **One of those two runs was finished across two sessions, and the pooling is a logged
+  deviation.** T41b's first batch was killed by the harness at 53 of 60 questions per arm
+  for system memory pressure; T17 resumability appended the remaining 7 per arm six days
+  later instead of opening fresh run dirs. Cross-arm pairing (`decisions/0010`) survives
+  — all three arms stopped and resumed at the same question boundary with identical qid
+  sets — and model-drift quarantine was 0/60 in every arm, but the pooled estimate spans
+  two sessions and that is a weaker guarantee than the rule intends. It changes no
+  conclusion here (the 7 tail questions fall in the two slices that scored exactly 0.000),
+  and it is recorded because a resumability feature silently converting a planned clean
+  rerun into a cross-session pool is the kind of thing that would otherwise go unnoticed.
 - **`refusal_correct` cannot distinguish "answered" from "refused invisibly".** Falling
   out of T41: replaying the broad `passages do not contain` pattern offline over both
   arms puts in-scope prose refusals at 5 (decision-field) vs 4 (control) — nearly

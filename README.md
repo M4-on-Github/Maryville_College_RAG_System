@@ -146,10 +146,15 @@ which **failed its claim**, so the "sources arrive at least 1 s before the first
 token" claim was dropped rather than fixed, and only the tested ordering property
 is claimed (`docs/LIMITATIONS.md` §7).
 
-The structured-refusal A/B (T41) has since been run on dev and **rejected**
-(`decisions/0017`): the model emits the `DECISION:` field reliably and it catches
-every out-of-scope case, but the prompt that produces it suppresses partial answers,
-so the frozen prompt stands unchanged.
+Two structured-refusal A/Bs have since been run on dev and **both rejected**. T41
+(`decisions/0017`): the model emits the `DECISION:` field reliably and it catches every
+out-of-scope case, but putting the label first suppresses partial answers. T41b
+(`decisions/0018`) moved the label to the end, which fixed that — no content losses,
+longer answers, no out-of-scope question answered at all — yet pooled `refusal_correct`
+came to +0.033 [−0.050, +0.133], about two question flips in sixty, so it failed the
+pre-registered primary too. Under the stopping rule that closes the labelling route: the
+frozen prompt stands unchanged and layer 5 ships with its blind spot measured and
+documented rather than patched.
 
 Not yet done: the recorded demo (T33) and Phase 7 maintenance.
 The reference client's real-browser pass covered the zero-quota demo server only.
