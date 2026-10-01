@@ -341,6 +341,109 @@ def test_a_torn_stream_chunk_is_an_error_not_a_silent_short_answer():
         server.server_close()
 
 
+def test_generate_path_handles_broken_stream_connection():
+    """A stream connection broken mid-answer must raise GenerationError, not
+    the raw requests exception. The handler sends valid chunks then closes
+    the connection abruptly without [DONE], forcing requests to raise an
+    exception during iter_lines(). We use Content-Length with chunked encoding
+    to make requests detect the premature connection close.
+    """
+
+    class BrokenStreamHandler(StubHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            # Send one valid chunk
+            chunk = json.dumps(delta(content="incomplete")).encode()
+            line = b"data: " + chunk + b"\n\n"
+            # Write chunk size and data
+            self.wfile.write(f"{len(line):x}\r\n".encode())
+            self.wfile.write(line)
+            self.wfile.write(b"\r\n")
+            self.wfile.flush()
+            # Close abruptly without sending final 0\r\n, simulating connection drop
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), BrokenStreamHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        gen = generator(f"http://127.0.0.1:{server.server_address[1]}/v1")
+        # generate() is the streaming path; consume it to trigger the error
+        with pytest.raises(GenerationError, match="stream connection broken"):
+            list(gen.generate("hi"))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_complete_path_handles_broken_stream_connection():
+    """complete() must also raise GenerationError for broken streams,
+    not the raw requests exception. It drains generate() internally.
+    """
+
+    class BrokenStreamHandler(StubHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            # Send one valid chunk then close abruptly
+            chunk = json.dumps(delta(content="incomplete")).encode()
+            line = b"data: " + chunk + b"\n\n"
+            self.wfile.write(f"{len(line):x}\r\n".encode())
+            self.wfile.write(line)
+            self.wfile.write(b"\r\n")
+            self.wfile.flush()
+            # Close abruptly without final 0\r\n
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), BrokenStreamHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        gen = generator(f"http://127.0.0.1:{server.server_address[1]}/v1")
+        with pytest.raises(GenerationError, match="stream connection broken"):
+            gen.complete("hi")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_non_streaming_path_handles_a_broken_response_body():
+    """The `stream=False` branch has its own error, and its own wording.
+
+    `stream=False` is only ever set by the calibration probe, so this branch
+    had no test at all -- its sibling's two tests both drive the streaming
+    path, since `complete()` drains `generate()`. A torn body here surfaces as
+    `requests.exceptions.JSONDecodeError`, which is a `RequestException`, and
+    must come back as a GenerationError naming the path it actually failed on.
+    """
+
+    class TruncatedBodyHandler(StubHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            body = b'{"choices": [{"message": {"content": "half an ans'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            self.wfile.flush()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), TruncatedBodyHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        gen = generator(f"http://127.0.0.1:{server.server_address[1]}/v1", stream=False)
+        with pytest.raises(GenerationError, match="response body broken"):
+            gen.complete("hi")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_no_key_is_read_until_a_call_is_made(monkeypatch, tmp_path):
     """Config loading and the test suite must work on a machine with no key."""
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)

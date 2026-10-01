@@ -418,16 +418,25 @@ class OllamaCloudGenerator(Generator):
         response.encoding = "utf-8"
 
         if not payload.get("stream"):
-            yield response.json()
+            try:
+                yield response.json()
+            except requests.RequestException as exc:
+                # Not "stream" -- this branch never opened one. A torn body and
+                # an unparseable one both surface here, and naming the wrong
+                # path in the error sends the next reader to the wrong code.
+                raise GenerationError("response body broken") from exc
             return
 
-        for line in response.iter_lines(decode_unicode=True):
-            if not line or not line.startswith("data:"):
-                continue
-            data = line[len("data:") :].strip()
-            if data == "[DONE]":
-                return
-            try:
-                yield json.loads(data)
-            except json.JSONDecodeError as exc:
-                raise GenerationError(f"unparseable stream chunk: {data[:200]}") from exc
+        try:
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[len("data:") :].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    yield json.loads(data)
+                except json.JSONDecodeError as exc:
+                    raise GenerationError(f"unparseable stream chunk: {data[:200]}") from exc
+        except requests.RequestException as exc:
+            raise GenerationError("stream connection broken") from exc
