@@ -14,7 +14,8 @@ The reformulator is the *real* `HistoryConcatenationReformulator`, not a fake:
 it is free (no model call), and it makes `rewritten_query` genuinely non-null
 on a follow-up, which is one of the things the client has to render.
 
-    python scripts/serve_reference_client_demo.py
+    python scripts/serve_reference_client_demo.py              # Task 29's fixture
+    python scripts/serve_reference_client_demo.py --client chat  # clients/chat.html
     # then open http://127.0.0.1:8099/ and paste the token it prints
 
 This is a fixture, not a deployment: it binds loopback only, its token is a
@@ -38,7 +39,11 @@ from mcrag.service.config import Settings  # noqa: E402
 from mcrag.types import Hit  # noqa: E402
 from tests.test_service import FakeGenerator, FakeLeg, _chunk, _pipeline  # noqa: E402
 
-CLIENT = ROOT / "clients" / "reference_client.html"
+CLIENTS = {
+    "reference": ROOT / "clients" / "reference_client.html",
+    "chat": ROOT / "clients" / "chat.html",
+}
+DEFAULT_CLIENT = "reference"
 TOKEN = "demo-token-not-a-secret"  # noqa: S105 -- a fixture's constant, loopback only
 PORT = 8099
 
@@ -57,7 +62,7 @@ CHUNKS = [
 REFUSAL_TEXT = "I cannot find any information about that in the passages provided."
 
 
-def build_app():
+def build_app(client: str = DEFAULT_CLIENT):
     generator = FakeGenerator()
     # The third manual question: a model-pathway refusal. Keyed on a substring
     # of the prompt, which contains the user's own question verbatim inside
@@ -72,17 +77,32 @@ def build_app():
 
     app = create_app(settings=Settings(api_token=TOKEN, cors_origins=[]), pipeline=pipeline)
 
+    page = CLIENTS[client]
+
     @app.get("/")
-    def client() -> FileResponse:
-        return FileResponse(CLIENT, media_type="text/html")
+    def serve_client() -> FileResponse:
+        return FileResponse(page, media_type="text/html")
 
     return app
 
 
 if __name__ == "__main__":
+    import argparse
+
     import uvicorn
 
-    print(f"reference client: http://127.0.0.1:{PORT}/   API key: {TOKEN}")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--client",
+        choices=sorted(CLIENTS),
+        default=DEFAULT_CLIENT,
+        help="which client to serve at /. Default `reference` is Task 29's own fixture, so a"
+        " re-run of T29's manual verification shows exactly what it showed then; `chat` serves"
+        " clients/chat.html, the kept conversational client.",
+    )
+    args = parser.parse_args()
+
+    print(f"{args.client} client: http://127.0.0.1:{PORT}/   API key: {TOKEN}")
     print("suggested three questions: 'What is the deposit?' -> a follow-up like")
     print("'When is it due?' (shows rewritten_query) -> anything with 'parking' (refusal)")
-    uvicorn.run(build_app(), host="127.0.0.1", port=PORT, log_level="warning")
+    uvicorn.run(build_app(args.client), host="127.0.0.1", port=PORT, log_level="warning")

@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<!--
+  mcrag chat client.
+
+  This is the NEW client `clients/reference_client.html`'s header asks for:
+  "when the real front end is decided, it is a NEW client written against
+  docs/stream_contract.md -- not a refactor of this file". So the fixture is
+  left exactly as it is (it is still what Task 29's verification harness and
+  scripts/serve_reference_client_demo.py serve), and the conversational UI
+  lives here instead.
+
+  Still one file, no framework, no build step, no dependency -- but unlike the
+  fixture this one is meant to be kept, so it has error states, keyboard and
+  screen-reader handling, a theme, and a phone layout.
+
+  Everything it knows about the server is in docs/stream_contract.md. The five
+  contract properties it is built to preserve, all of which are easy to lose
+  when you make a protocol look like a chat window:
+
+    1. `sources` renders BEFORE the first token, because that is the entire
+       point of the protocol -- the model thinks for seconds before it writes,
+       and that gap is filled with what was retrieved instead of a spinner.
+    2. Citations are spliced at the server's `claim_span` offsets. The client
+       never re-parses prose to find what a citation covers.
+    3. A `refusal` is rendered structurally from `office`/`contact_url`/`email`.
+       No apology is ever pattern-matched to find a contact.
+    4. `done`'s per-stage `latency_ms` is shown, with `null` as an em dash --
+       a stage that did not run never reads as 0 ms.
+    5. SSE is parsed by hand over `fetch`, not `EventSource`, which is GET-only
+       and cannot send the `X-API-Key` header the service requires (Task 25).
+
+  Memory: the server holds none, by design (Task 28). This client owns the
+  conversation and sends prior *user* turns only, oldest first; the service
+  re-answers them on every request rather than trusting a client transcript of
+  what it supposedly said. That is a real cost, so it is shown in the details
+  row rather than hidden.
+
+  Usage: serve it next to the API --
+      python scripts/serve_reference_client_demo.py --client chat
+-->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maryville College Assistant</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f4f6;
+    --surface: #ffffff;
+    --surface-2: #f8f8fa;
+    --border: #e3e3e8;
+    --text: #1b1b20;
+    --muted: #6b6b76;
+    --accent: #4b47c9;
+    --accent-soft: #eeedfb;
+    --user-bg: #4b47c9;
+    --user-text: #ffffff;
+    --warn: #9a3412;
+    --warn-soft: #fef2ec;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --surface: #1e1e24;
+      --surface-2: #26262e;
+      --border: #32323c;
+      --text: #ececf1;
+      --muted: #9b9ba6;
+      --accent: #9d9af6;
+      --accent-soft: #272640;
+      --user-bg: #4b47c9;
+      --user-text: #ffffff;
+      --warn: #fca570;
+      --warn-soft: #2e1d14;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding: .6rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .brand { font-weight: 650; letter-spacing: -.01em; margin-right: auto; }
+  .brand small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; letter-spacing: 0; }
+  header label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: .35rem; }
+  input[type=password] {
+    font: inherit; font-size: 13px;
+    padding: .35rem .5rem;
+    width: 11rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  button {
+    font: inherit; font-size: 13px;
+    padding: .4rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+
+  /* ---- thread ---- */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem 1rem 1rem;
+  }
+  .thread { max-width: 46rem; margin: 0 auto; display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .turn { display: flex; flex-direction: column; gap: .4rem; }
+  .turn.user { align-items: flex-end; }
+
+  .bubble {
+    background: var(--user-bg);
+    color: var(--user-text);
+    padding: .55rem .9rem;
+    border-radius: var(--radius) var(--radius) 4px var(--radius);
+    max-width: 85%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px var(--radius) var(--radius) var(--radius);
+    padding: .85rem 1rem;
+  }
+
+  .status {
+    display: flex; align-items: center; gap: .5rem;
+    color: var(--muted); font-size: 13px;
+  }
+  .dot {
+    width: .5rem; height: .5rem; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; opacity: .7; } }
+
+  /* ---- sources (rendered before any token: contract property 1) ---- */
+  .sources { margin-bottom: .7rem; }
+  .sources > summary {
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  }
+  .sources > summary:hover { color: var(--accent); }
+  .rewritten {
+    font-size: 12.5px; color: var(--muted); margin: .4rem 0 0;
+    border-left: 2px solid var(--border); padding-left: .55rem;
+  }
+  .srclist { list-style: none; margin: .5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+  .srclist li { font-size: 13px; display: flex; gap: .45rem; align-items: baseline; }
+  .srcnum {
+    flex: none;
+    min-width: 1.35rem; text-align: center;
+    font-size: 11px; font-weight: 650;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 5px; padding: .05rem .2rem;
+  }
+  .srcmeta { color: var(--muted); font-size: 12px; }
+  .stale { color: var(--warn); font-weight: 600; }
+
+  /* ---- answer ---- */
+  .answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .answer:empty { display: none; }
+  .answer a.cite { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  .answer a.cite:hover { color: var(--accent); }
+  .answer sup.mark {
+    font-size: 10px; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 4px; padding: .05rem .25rem;
+    margin-left: .12rem; text-decoration: none;
+    vertical-align: super; line-height: 1;
+  }
+  .caret {
+    display: inline-block; width: .5em; height: 1em;
+    background: var(--accent); vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---- refusal ---- */
+  .refusal {
+    background: var(--warn-soft);
+    border-left: 3px solid var(--warn);
+    border-radius: 0 8px 8px 0;
+    padding: .6rem .8rem;
+    font-size: 14px;
+  }
+  .refusal p { margin: 0 0 .5rem; }
+  .refusal .who { font-weight: 600; }
+  .refusal a { color: inherit; }
+  .refusal .reason { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ---- details / timings ---- */
+  .meta { margin-top: .7rem; border-top: 1px solid var(--border); padding-top: .5rem; }
+  .meta > summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  .meta > summary:hover { color: var(--accent); }
+  .timings {
+    margin: .5rem 0 0; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: .2rem .8rem; font-size: 12px; color: var(--muted);
+  }
+  .timings b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .note { font-size: 12px; color: var(--muted); margin: .5rem 0 0; }
+
+  .error {
+    background: var(--warn-soft); border: 1px solid var(--warn);
+    color: var(--warn); border-radius: 8px; padding: .6rem .8rem; font-size: 13.5px;
+  }
+  .banner {
+    max-width: 46rem; margin: 0 auto 1rem;
+    background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn);
+    border-radius: 8px; padding: .5rem .8rem; font-size: 13px;
+  }
+
+  /* ---- empty state ---- */
+  .empty { text-align: center; color: var(--muted); padding: 2.5rem 0 1rem; }
+  .empty h1 { font-size: 20px; color: var(--text); margin: 0 0 .3rem; letter-spacing: -.01em; }
+  .empty p { margin: 0 auto; max-width: 30rem; font-size: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.25rem; }
+  .chips button { font-size: 13px; border-radius: 999px; padding: .4rem .8rem; background: var(--surface); }
+
+  /* ---- composer ---- */
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: .75rem 1rem 1rem;
+  }
+  .composer { max-width: 46rem; margin: 0 auto; display: flex; gap: .5rem; align-items: flex-end; }
+  textarea {
+    flex: 1; font: inherit; resize: none;
+    padding: .6rem .75rem; min-height: 2.6rem; max-height: 9rem;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); color: var(--text);
+  }
+  textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .composer button { padding: .6rem 1rem; }
+  #send { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  #send:hover:not(:disabled) { color: #fff; filter: brightness(1.08); }
+  .hint { max-width: 46rem; margin: .45rem auto 0; font-size: 11.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Maryville College Assistant
+    <small id="turncount">no conversation yet</small>
+  </div>
+  <label>API key
+    <input id="token" type="password" autocomplete="off" placeholder="X-API-Key">
+  </label>
+  <button id="reset" title="Clears the conversation this client is holding">New conversation</button>
+</header>
+
+<main id="scroll">
+  <div id="banner" class="banner" hidden></div>
+  <div class="thread" id="thread">
+    <div class="empty" id="empty">
+      <h1>Ask about Maryville College</h1>
+      <p>Answers are generated only from pages retrieved from the college's own site, and
+         every source is listed before the answer is written.</p>
+      <div class="chips">
+        <button type="button">What is the enrollment deposit?</button>
+        <button type="button">When is the FAFSA priority deadline?</button>
+        <button type="button">How do I request a transcript?</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <form class="composer" id="composer">
+    <textarea id="question" rows="1" placeholder="Ask a question&#10;Enter to send · Shift+Enter for a new line"
+              aria-label="Your question"></textarea>
+    <button id="send" type="submit">Send</button>
+    <button id="stop" type="button" hidden>Stop</button>
+  </form>
+  <p class="hint">The conversation is held in this page only — the server keeps no session
+     (Task 28). The API key stays in memory and is never stored.</p>
+</footer>
+
+<script>
+"use strict";
+
+// The endpoint is always same-origin and relative, deliberately: this page
+// sends an API key, and any configurable base URL (a `?api=` parameter, say)
+// would be a way to make it send that key to someone else's host.
+const ENDPOINT = "/ask";
+const SCHEMA = "v1";
+
+// Prior *user* turns only, oldest first -- never assistant text, which the
+// service regenerates itself rather than trusting this page's transcript of it
+// (mcrag.service.answer._run_prior_turns). This array IS the memory: there is
+// no session id and no server-side store.
+let history = [];
+let inflight = null;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+
+// Server-supplied strings reach `href`, so only ever http(s) and mailto get
+// through -- a `javascript:` URL in a source's `url` field would otherwise be
+// one retrieval bug away from running here.
+function safeUrl(raw, allowMailto) {
+  try {
+    const u = new URL(raw, location.origin);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+    if (allowMailto && u.protocol === "mailto:") return u.href;
+  } catch (_) { /* fall through */ }
+  return null;
+}
+
+function link(url, text, cls, allowMailto) {
+  const href = safeUrl(url, allowMailto);
+  if (!href) return el("span", cls, text);
+  const a = el("a", cls, text);
+  a.href = href;
+  if (!href.startsWith("mailto:")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+  return a;
+}
+
+function scrollDown() {
+  $("scroll").scrollTop = $("scroll").scrollHeight;
+}
+
+/* ---------------------------------------------------------------- one turn */
+
+// Each assistant turn owns its own accumulated text and citation list, because
+// `claim_span` offsets are into *this* answer, not the whole transcript.
+function newTurn(question) {
+  $("empty")?.remove();
+
+  const userRow = el("div", "turn user");
+  userRow.append(el("div", "bubble", question));
+
+  const card = el("div", "card");
+  // role="status" is an implicit polite live region, so "searching" then
+  // "reading those pages" is announced. The streaming answer itself is not a
+  // live region on purpose -- announcing every token would be unusable; it is
+  // marked aria-busy instead, and the `done` summary is the completion cue.
+  const status = el("div", "status");
+  status.setAttribute("role", "status");
+  status.append(el("span", "dot"), el("span", null, "Searching Maryville College pages…"));
+  const sources = el("details", "sources");
+  sources.open = true;
+  sources.hidden = true;
+  const answer = el("div", "answer");
+  answer.setAttribute("aria-busy", "true");
+  const slot = el("div");          // refusal or error lands here
+  const meta = el("details", "meta");
+  meta.hidden = true;
+  card.append(status, sources, answer, slot, meta);
+
+  const row = el("div", "turn assistant");
+  row.append(card);
+  $("thread").append(userRow, row);
+  scrollDown();
+
+  return {
+    status, sources, answer, slot, meta,
+    text: "",
+    cites: [],
+    chunks: [],
+    priorTurns: history.length,
+    started: performance.now(),
+  };
+}
+
+/* --------------------------------------------------- citations (property 2) */
+
+// Citations arrive as [start, end) offsets into the answer text accumulated so
+// far. The spans are spliced at exactly those offsets -- the prose is never
+// re-parsed to find what a citation covers or where its link belongs.
+//
+// The marker number is the source's position in this turn's `sources` list,
+// matched by `source_url`: the contract notes that `sources` chunks carry no
+// `chunk_id` of their own, so the url is the only join key available. Two
+// chunks from the same page therefore share one number, which is correct --
+// the number names the page the reader can go read.
+function renderAnswer(t) {
+  const frag = document.createDocumentFragment();
+  const ordered = [...t.cites].sort((a, b) => a.claim_span[0] - b.claim_span[0]);
+  let at = 0;
+
+  for (const c of ordered) {
+    const [s, e] = c.claim_span;
+    if (s < at || s > e || e > t.text.length) continue;  // overlapping or not-yet-arrived: first one wins
+    if (s > at) frag.append(document.createTextNode(t.text.slice(at, s)));
+
+    const idx = t.chunks.findIndex((k) => k.url === c.source_url);
+    frag.append(link(c.source_url, t.text.slice(s, e), "cite"));
+    if (idx >= 0) {
+      const mark = el("sup", "mark", String(idx + 1));
+      mark.title = t.chunks[idx].title;
+      frag.append(mark);
+    }
+    at = e;
+  }
+  if (at < t.text.length) frag.append(document.createTextNode(t.text.slice(at)));
+
+  if (inflight) frag.append(el("span", "caret"));
+  t.answer.replaceChildren(frag);
+}
+
+/* ------------------------------------------------------------ event handling */
+
+function onSources(t, data) {
+  t.chunks = data.chunks || [];
+
+  // Property 1: this runs before a single token exists. The retrieved pages
+  // are the thing that fills the model's thinking time, so they are on screen
+  // the moment they arrive.
+  t.sources.hidden = false;
+  t.sources.replaceChildren(
+    el("summary", null, t.chunks.length === 1 ? "1 source" : `${t.chunks.length} sources`)
+  );
+  if (data.rewritten_query) {
+    // Never rewrite silently: if retrieval ran on something other than what
+    // was typed, the reader is told so.
+    t.sources.append(el("p", "rewritten", `Retrieved on: “${data.rewritten_query}”`));
+  }
+  const ul = el("ul", "srclist");
+  t.chunks.forEach((c, i) => {
+    const li = el("li");
+    li.append(el("span", "srcnum", String(i + 1)));
+    const body = el("div");
+    body.append(link(c.url, c.title || c.url, null));
+    const trail = (c.heading_path || []).join(" › ");
+    const bits = [];
+    if ((c.silo || []).length) bits.push((c.silo).join(", "));
+    bits.push(`verified ${c.last_verified}`);
+    if (c.rerank_score !== null && c.rerank_score !== undefined) bits.push(`score ${c.rerank_score}`);
+    const m = el("div", "srcmeta", (trail ? trail + " · " : "") + bits.join(" · "));
+    if (c.stale) m.append(el("span", "stale", " · out of date"));
+    body.append(m);
+    li.append(body);
+    ul.append(li);
+  });
+  t.sources.append(ul);
+
+  t.status.replaceChildren();
+  t.status.append(el("span", "dot"), el("span", null, "Reading those pages…"));
+  scrollDown();
+}
+
+function onToken(t, data) {
+  if (t.status.isConnected) t.status.remove();
+  t.text += data.text;
+  renderAnswer(t);
+  scrollDown();
+}
+
+// Property 3: built from the structured fields. Nothing here reads the
+// generated text, because on a refusal there is none to read.
+function onRefusal(t, data) {
+  if (t.status.isConnected) t.status.remove();
+  const box = el("div", "refusal");
+  box.append(el("p", null, "I could not answer this from the college's own pages. The office that can:"));
+  const who = el("p", "who");
+  who.append(link(data.contact_url, data.office, null));
+  if (data.email) {
+    who.append(document.createTextNode(" · "));
+    who.append(link("mailto:" + data.email, data.email, null, true));
+  }
+  box.append(who);
+  box.append(el("div", "reason", `refusal pathway: ${data.reason}`));
+  t.slot.replaceChildren(box);
+  scrollDown();
+}
+
+function onDone(t, data) {
+  t.answer.removeAttribute("aria-busy");
+  t.meta.hidden = false;
+  t.meta.replaceChildren(
+    el("summary", null, `${data.refused ? "Refused" : "Answered"} in ${Math.round((data.latency_ms || {}).e2e ?? 0)} ms`)
+  );
+
+  // Property 4: a stage that did not run shows an em dash. `reform: null` and
+  // `reform: 0.0` mean different things and must not look the same.
+  const grid = el("div", "timings");
+  for (const [k, v] of Object.entries(data.latency_ms || {})) {
+    const cell = el("div");
+    cell.append(document.createTextNode(k + " "));
+    cell.append(el("b", null, v === null || v === undefined ? "—" : `${Math.round(v)} ms`));
+    grid.append(cell);
+  }
+  t.meta.append(grid);
+
+  if (data.server_ns && data.server_ns.total != null) {
+    t.meta.append(el("p", "note",
+      `provider-side generation: ${Math.round(data.server_ns.total / 1e6)} ms total, ` +
+      `${Math.round((data.server_ns.prompt_eval || 0) / 1e6)} ms prompt, ` +
+      `${Math.round((data.server_ns.eval || 0) / 1e6)} ms tokens`));
+  }
+
+  // The honest cost of a stateless server: prior turns are re-answered on
+  // every request, so a long conversation is a linearly more expensive one.
+  if (t.priorTurns > 0) {
+    t.meta.append(el("p", "note",
+      `${t.priorTurns} prior turn${t.priorTurns === 1 ? "" : "s"} re-answered for this request ` +
+      `(the server holds no session, so the conversation is replayed each time).`));
+  }
+
+  if (data.schema_version !== SCHEMA) {
+    $("banner").hidden = false;
+    $("banner").textContent =
+      `This page speaks stream schema ${SCHEMA}; the server answered with ` +
+      `${data.schema_version}. Fields may be missing or misread.`;
+  }
+  scrollDown();
+}
+
+const HANDLERS = { sources: onSources, token: onToken, citation: onCitation, refusal: onRefusal, done: onDone };
+
+function onCitation(t, data) {
+  t.cites.push(data);
+  renderAnswer(t);
+}
+
+/* ------------------------------------------------------------------- the ask */
+
+async function ask(question) {
+  if (inflight) return;
+  const t = newTurn(question);
+  const controller = new AbortController();
+  inflight = controller;
+  $("send").disabled = true;
+  $("stop").hidden = false;
+
+  try {
+    const resp = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": $("token").value },
+      body: JSON.stringify({ question, history }),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      const why = resp.status === 401 || resp.status === 403
+        ? "The API key was rejected. Paste a valid key in the header and send again."
+        : resp.status === 429 ? "Rate limited by the service. Wait a moment and send again."
+        : `The service answered HTTP ${resp.status}.`;
+      throw new Error(why);
+    }
+
+    // Property 5: hand-rolled SSE over fetch. EventSource is GET-only and
+    // cannot carry X-API-Key (Task 25).
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        const type = /^event: (.+)$/m.exec(frame)?.[1];
+        const raw = /^data: (.+)$/m.exec(frame)?.[1];
+        if (!type || !raw) continue;
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch (_) {
+          // Half an event is not a short answer. Surfaced, never swallowed.
+          throw new Error("The stream sent a frame this page could not read, so the answer above may be incomplete.");
+        }
+        HANDLERS[type]?.(t, data);
+      }
+    }
+
+    // A turn joins the memory once its stream completed -- refused or not,
+    // since a refusal is still something the student asked. An aborted or
+    // failed turn does not, so the history never claims a turn the server
+    // never finished answering.
+    history.push(question);
+    $("turncount").textContent = `${history.length} turn${history.length === 1 ? "" : "s"} held in this page`;
+  } catch (err) {
+    t.status.remove();
+    t.answer.removeAttribute("aria-busy");
+    const aborted = err.name === "AbortError";
+    t.slot.append(el("div", aborted ? "note" : "error",
+      aborted ? "Stopped." : (err.message || "The request failed before the answer finished.")));
+  } finally {
+    inflight = null;
+    $("send").disabled = false;
+    $("stop").hidden = true;
+    renderAnswer(t);          // drops the streaming caret
+    scrollDown();
+  }
+}
+
+/* ---------------------------------------------------------------- plumbing */
+
+function submit() {
+  const q = $("question").value.trim();
+  if (!q || inflight) return;
+  $("question").value = "";
+  $("question").style.height = "auto";
+  ask(q);
+}
+
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+$("stop").onclick = () => inflight?.abort();
+
+$("question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+});
+$("question").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 144) + "px";
+});
+
+document.querySelectorAll(".chips button").forEach((b) => {
+  b.onclick = () => { $("question").value = b.textContent; submit(); };
+});
+
+$("reset").onclick = () => {
+  inflight?.abort();
+  history = [];
+  $("banner").hidden = true;
+  $("turncount").textContent = "no conversation yet";
+  $("thread").replaceChildren();
+  const empty = el("div", "empty");
+  const h = el("h1", null, "Ask about Maryville College");
+  empty.append(h, el("p", null,
+    "Answers are generated only from pages retrieved from the college's own site, and every source is listed before the answer is written."));
+  empty.id = "empty";
+  $("thread").append(empty);
+  $("question").focus();
+};
+
+$("question").focus();
+</script>
+</body>
+</html>

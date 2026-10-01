@@ -62,8 +62,11 @@ flowchart LR
 Retrieval runs on the rewritten query, but the answer is generated against the
 original question (`decisions/0015`). The service keeps no
 conversation state; the client sends prior user turns with each request. The wire
-format is specified in `docs/stream_contract.md`, and `clients/reference_client.html`
-is a disposable client proving that document is enough to build one from.
+format is specified in `docs/stream_contract.md`. Two clients read it:
+`clients/reference_client.html`, the disposable fixture that proved the document
+is enough to build from (Task 29), and `clients/chat.html`, a conversational
+client that is kept. The second is a new file rather than a restyling of the
+first, which is what the fixture's own header asks for.
 
 ## Corpus coverage
 
@@ -125,9 +128,21 @@ To serve the API (`POST /ask`, `GET /health`), run:
 uvicorn mcrag.service.api:app
 ```
 
-To try the reference client with no key and no generation quota, run
-`python scripts/serve_reference_client_demo.py` and open the URL it prints. It
-fakes generation only; everything below the transport is real.
+To try a client with no key of your own and no generation quota, run
+`python scripts/serve_reference_client_demo.py` (Task 29's fixture) or
+`python scripts/serve_reference_client_demo.py --client chat` (the chat client)
+and open the URL it prints. It fakes generation only; everything below the
+transport is real.
+
+`clients/chat.html` is checked by `node clients/verify_chat_client.mjs`, which
+drives its real event handlers under a small DOM shim against captured server
+frames and asserts the five properties a chat UI loses first: sources on screen
+before any token, citations spliced at the server's `claim_span` offsets, a
+refusal built from `office`/`contact_url`/`email` rather than from prose, a
+`null` latency stage shown as `—` rather than `0 ms`, and SSE read over `fetch`
+rather than `EventSource`. It needs `node`; `pytest` does not run it, and
+nothing else in the repo depends on node. Neither client has yet been driven in
+a real browser against live `gemma4:31b` — that gap is unchanged.
 
 ## Results
 
