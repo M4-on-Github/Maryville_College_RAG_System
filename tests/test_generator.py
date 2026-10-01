@@ -308,13 +308,24 @@ def test_provider_error_body_survives(endpoint):
         generator(endpoint).complete("hi")
 
 
-def test_a_torn_stream_chunk_is_an_error_not_a_silent_short_answer(endpoint):
-    """Half an answer returned as a whole one is worse than a failure."""
+def test_a_torn_stream_chunk_is_an_error_not_a_silent_short_answer():
+    """Half an answer returned as a whole one is worse than a failure.
+
+    The handler must **drain the request body before replying**. Without that,
+    the server closes a socket that still holds unread bytes, which sends a TCP
+    RST rather than a FIN; the client then raises a connection error instead of
+    reading the malformed `data:` line, and the test fails for a reason that has
+    nothing to do with what it is checking. That made it flaky at roughly one run
+    in three under load (passing in isolation), until the drain and the explicit
+    `Connection: close` below pinned the teardown down.
+    """
 
     class TornHandler(StubHandler):
         def do_POST(self) -> None:  # noqa: N802
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b'data: {"choices": [{"delta"\n\n')
             self.wfile.flush()
