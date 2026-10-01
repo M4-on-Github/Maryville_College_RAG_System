@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-01
 **Status:** accepted
-**Task:** T36 (re-run trigger and result versioning), and the review of the subagent that built it
+**Task:** T36 (re-run trigger and result versioning), the review of the subagent that built it, and the review of my own rewrite
 
 ## Context
 
@@ -232,6 +232,74 @@ wrong:
    checkout therefore has a published lock and no live one, which reports
    `undetermined` and exit 3 — correct: build the index first.
 
+## The same defect, in my own rewrite
+
+The fix for the agent's three-valued alert read was mine, and nobody reviewed
+it. Reading it back found the defect it exists to prevent, inside the function
+written to prevent it.
+
+`_alerts_open` collected the fired alerts with `a.get("fired")` across the list
+and answered `False` when none came back truthy. I probed it rather than
+reasoning about it, and five separately malformed rows all returned
+`(False, None)` — measured silence:
+
+| the row | read as |
+|---|---|
+| two of the four checks present | no alert is open |
+| an **empty** alert list | no alert is open |
+| an entry with no `fired` key | that check ran and found nothing |
+| `"fired": "no"`, a string | that check ran and found nothing |
+| a non-dict entry in the list | skipped; answer taken from the rest |
+
+The empty list is the one that matters. `decisions/0021` is about four alert
+instances three of which could not fire; this is a reader of their output
+treating a row carrying *zero* verdicts as all four having run and found
+nothing. `append_maintenance_log`'s own docstring calls the argument "list of
+all four Alert records" — the completeness was documented and never checked.
+
+"No alert is open" is now a claim about the whole set: every entry must be a
+dict with a string name and a **boolean** verdict, every check must have
+reported, and the exit code must agree with the verdicts. Anything else is
+`undetermined`, which is exit 3.
+
+### One source of truth for what "all the checks" means
+
+The count had to come from somewhere, and hardcoding four in the trigger would
+have been the same bug with a longer fuse: a fifth check added to `alerts.py`
+would leave every five-check row reading as complete while one verdict went
+unexamined. `ALL_CHECKS` and `ALL_CHECK_NAMES` are new in `alerts.py`,
+`run.py` builds its checks from the tuple instead of naming the four by hand,
+and the trigger counts against the names. A test asserts the two agree and
+that `run.py` has not gone back to rebuilding the list beside the canonical
+one.
+
+### Two smaller ones
+
+`_read_last_maintenance_log` did not catch `OSError` while `_read_lock` did,
+so a permission error on the maintenance log crashed the run to exit 1 while
+the same error on a corpus lock exited 3 — two different events for a reader,
+with nothing to tell them apart. `_alerts_open`'s docstring already claimed it
+reported "unreadable" as unknown. It does now, for both files.
+
+And the fired alert names were computed and thrown away. The reason sentence
+read "A T34 maintenance alert is open on the last run" and sent the reader to
+another file to learn which one, in a module whose stated premise is that the
+logged row is the only diagnosis they get. The names are now in the sentence
+and in `detail["fired_alerts"]` — which is `None`, not `[]`, when the status is
+unknown, because `[]` would say the checks ran and none of them fired.
+
+### Decisions in this round the brief did not cover
+
+6. **A row whose exit code disagrees with its own verdicts is `undetermined`
+   in both directions.** Decision 3 above covered exit 2 beside nothing fired.
+   The mirror — exit 0 beside a fired alert — is equally impossible for T34 to
+   have written, and equally untrustworthy.
+7. **Completeness is measured against the canonical check set, not a literal
+   four.** A row missing any check that currently exists is refused, so adding
+   a fifth check correctly invalidates rows written before it existed. That is
+   the intended reading: those rows carry no verdict from the new check, and
+   the trigger should say so rather than assume it would have passed.
+
 ## Verification
 
 Eighteen mutations, each reverted after, each caught:
@@ -271,7 +339,47 @@ document, and it took a second look to notice it in my own tooling. The table
 above is from the re-run against real paths, with an unmutated control
 confirming exit 0 first.
 
-Full suite: **834 passed** (801 after T34, 33 of them this task).
+### The second round, against my own fixes
+
+Fourteen more mutations, control first, each caught:
+
+| mutation | caught |
+|---|---|
+| the incomplete-verdict-set guard never fires | yes |
+| completeness measured against the row instead of the canonical set | yes |
+| a non-boolean `fired` is accepted as a verdict | yes |
+| a missing `fired` key is coerced to not-fired | yes |
+| a non-dict alert entry is skipped instead of rejected | yes |
+| the exit-0-but-fired disagreement is ignored | yes |
+| the exit-2-but-nothing-fired disagreement is ignored | yes |
+| `OSError` on the log read escapes again | yes |
+| `fired_alerts` is `[]` rather than `None` when the status is unknown | yes |
+| the reason sentence stops naming which alert fired | yes |
+| the incomplete sentence stops naming the missing checks | yes |
+| the run rebuilds its check list by hand beside the canonical one | yes |
+| `ALL_CHECKS` loses a check, so the run stops performing it | yes |
+| `ALL_CHECK_NAMES` is derived from something other than `ALL_CHECKS` | yes |
+
+The control ran before anything was mutated and had to exit 0, which is the
+lesson from the void run above. It also earned its keep twice: the assertion
+added after that run — that every test path exists before the script does
+anything — caught a *second* wrong path in this script
+(`tests/test_task34_maintenance.py`; the file is `test_task34_alerts.py`)
+before a single mutation had been applied.
+
+### The trigger, run for real
+
+`scripts/run_rerun_trigger.py` against the actual repo rather than a fixture:
+**exit 3**. The published and live `corpus.lock` carry the same snapshot hash
+over the same 1699 urls, so the corpus condition is a measured 0.0% — but no
+maintenance run has ever been logged, so the alert condition cannot be
+established. The logged row carries `alerts_open: null` and
+`fired_alerts: null`, not `[]`. This is the first time an exit code from this
+task has been produced by real inputs, and it is the one the task exists for:
+**T34 shipped and has never executed**, and the trigger says so rather than
+reading it as silence.
+
+Full suite: **843 passed** (801 after T34, 42 of them this task).
 `RESULTS.md` regenerated: 60 rows, every one carrying a `corpus` cell, no
 blanks. `node clients/verify_chat_client.mjs`: 11 checks passed. `notes.md`
 unmodified by the suite, and `data/maintenance/` holds only the published lock.
