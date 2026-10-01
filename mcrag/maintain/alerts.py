@@ -341,3 +341,20 @@ class StaleGoldCheck(AlertCheck):
             urls=tuple(urls),
             detail={"stale_qids": qids},
         )
+
+
+# The canonical set of checks a maintenance run performs, in the order it
+# performs them. One source of truth, read by two callers: `run.py`
+# instantiates these, and `trigger.py` reads their names to decide whether a
+# logged row carries a verdict from every check. A trigger that hardcoded four
+# names would read a five-check row as complete while ignoring the fifth, and
+# `decisions/0021` is about exactly that -- four checks, three of which could
+# not fire, all reporting "nothing wrong".
+ALL_CHECKS: tuple[type[AlertCheck], ...] = (
+    ExtractionRegressionCheck,
+    CorpusShapeDriftCheck,
+    VolumeAnomalyCheck,
+    StaleGoldCheck,
+)
+
+ALL_CHECK_NAMES: frozenset[str] = frozenset(check.name for check in ALL_CHECKS)

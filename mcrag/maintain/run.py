@@ -27,12 +27,9 @@ from mcrag.crawl.manifest import Manifest
 from mcrag.eval.gold import load_gold_questions
 from mcrag.extract.trafilatura_extractor import TrafilaturaExtractor
 from mcrag.maintain.alerts import (
+    ALL_CHECKS,
     Alert,
-    CorpusShapeDriftCheck,
-    ExtractionRegressionCheck,
     MaintenanceContext,
-    StaleGoldCheck,
-    VolumeAnomalyCheck,
 )
 from mcrag.maintain.log import append_maintenance_log
 
@@ -368,13 +365,9 @@ def main(
         chunks=chunks,
     )
 
-    # Run all four alert checks
-    checks = [
-        ExtractionRegressionCheck(),
-        CorpusShapeDriftCheck(),
-        VolumeAnomalyCheck(),
-        StaleGoldCheck(),
-    ]
+    # Every check in the canonical set, which is also the set `trigger.py`
+    # requires a verdict from before it will read a row as "nothing is wrong".
+    checks = [check_cls() for check_cls in ALL_CHECKS]
 
     alerts: list[Alert] = []
     any_fired = False

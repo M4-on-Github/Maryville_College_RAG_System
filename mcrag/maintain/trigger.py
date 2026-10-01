@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from mcrag.maintain.alerts import ALL_CHECK_NAMES
+
 # A published result survives a corpus change of up to this fraction. Fires on
 # strictly greater, matching VOLUME_DRIFT_FRACTION in alerts.py.
 CHANGE_RATIO_CEILING = 0.10
@@ -124,10 +126,24 @@ def _compare_locks(
 
 
 def _read_last_maintenance_log(log_path: Path) -> dict[str, Any] | None:
-    """The last row of the T34 maintenance log, or None if there is not one."""
+    """The last row of the T34 maintenance log, or None if there is not one.
+
+    None covers missing, empty, unreadable, and not-JSON alike, because every
+    one of them leaves the caller unable to establish an alert status, and the
+    caller turns that into an exit-3 "a human must look".
+    """
     if not log_path.exists():
         return None
-    rows = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    try:
+        text = log_path.read_text(encoding="utf-8")
+    except OSError:
+        # Caught here for the same reason `_read_lock` catches it: an
+        # unreadable log leaves the alert status unknown, which is an exit-3
+        # "a human must look", not an exit-1 crash. Letting OSError escape
+        # made an unreadable lock and an unreadable log two different events
+        # for no reason a reader of either code could discover.
+        return None
+    rows = [line for line in text.splitlines() if line.strip()]
     if not rows:
         return None
     try:
@@ -137,21 +153,23 @@ def _read_last_maintenance_log(log_path: Path) -> dict[str, Any] | None:
     return row if isinstance(row, dict) else None
 
 
-def _alerts_open(log_path: Path) -> tuple[bool | None, str | None]:
-    """Is a T34 alert open? Three-valued; returns (answer, problem).
+def _alerts_open(log_path: Path) -> tuple[bool | None, str | None, tuple[str, ...]]:
+    """Is a T34 alert open? Three-valued; returns (answer, problem, fired names).
 
-    `None` is the answer whenever the alerts did not run or the row does not
-    say. Specifically: no log, an empty log, an exit-1 row (the ingest chain
-    died, so the four checks never ran), or a row whose exit code is missing
-    or is not one T34 writes. "No alert is open" is a claim about four checks
-    having run and found nothing, and none of those cases support it.
+    `None` is the answer whenever the checks did not run or the row does not
+    say: no log, an empty or unreadable log, an exit-1 row (the ingest chain
+    died, so the checks never ran), a row whose exit code is missing or is not
+    one T34 writes, a row whose alert list is malformed or incomplete, or a
+    row whose exit code disagrees with its own verdicts. "No alert is open" is
+    a claim about every check in `ALL_CHECK_NAMES` having run and found
+    nothing, and none of those cases support it.
     """
     row = _read_last_maintenance_log(log_path)
     if row is None:
         return None, (
             f"The maintenance log ({log_path}) is missing, empty, or unreadable; "
             "alert status is unknown."
-        )
+        ), ()
 
     exit_code = row.get("exit_code")
     run_id = row.get("run_id", "?")
@@ -159,30 +177,67 @@ def _alerts_open(log_path: Path) -> tuple[bool | None, str | None]:
     if exit_code == 1:
         return None, (
             f"The last maintenance run ({run_id}) exited 1: the ingest chain failed, "
-            "so the four alert checks never ran and no alert status was established."
-        )
+            "so the alert checks never ran and no alert status was established."
+        ), ()
     if exit_code not in (0, 2):
         return None, (
             f"The last maintenance run ({run_id}) has exit code {exit_code!r}, which is "
             "not one this job writes; alert status is unknown."
-        )
+        ), ()
 
     alerts = row.get("alerts")
     if not isinstance(alerts, list):
         return None, (
             f"The last maintenance run ({run_id}) carries no alert list; "
             "alert status is unknown."
-        )
+        ), ()
 
-    fired = [a.get("name", "?") for a in alerts if isinstance(a, dict) and a.get("fired")]
+    # Every entry must be a dict carrying a boolean `fired`, because
+    # `a.get("fired")` on a malformed entry is None, which is falsy, which
+    # would read as "this check ran and found nothing".
+    verdicts: dict[str, bool] = {}
+    for entry in alerts:
+        if not isinstance(entry, dict):
+            return None, (
+                f"The last maintenance run ({run_id}) has a non-object entry in its "
+                "alert list; the row cannot be read and alert status is unknown."
+            ), ()
+        name = entry.get("name")
+        fired_flag = entry.get("fired")
+        if not isinstance(name, str) or not isinstance(fired_flag, bool):
+            return None, (
+                f"The last maintenance run ({run_id}) has an alert entry with no name or "
+                f"no boolean verdict ({entry.get('name')!r}); alert status is unknown."
+            ), ()
+        verdicts[name] = fired_flag
+
+    # The count is the point. "No alert is open" is a claim about every check
+    # in ALL_CHECK_NAMES having run and found nothing; a row carrying two of
+    # them, or an empty list, supports no such claim. Before this guard an
+    # empty alert list read as measured silence, which is the `decisions/0021`
+    # failure inside the function written to prevent it.
+    missing = sorted(ALL_CHECK_NAMES - set(verdicts))
+    if missing:
+        return None, (
+            f"The last maintenance run ({run_id}) reports {len(verdicts)} of "
+            f"{len(ALL_CHECK_NAMES)} checks; no verdict from {', '.join(missing)}, "
+            "so alert status is unknown."
+        ), ()
+
+    fired = sorted(name for name, flag in verdicts.items() if flag)
     if exit_code == 2 and not fired:
         # T34 exits 2 only when something fired. Disagreement means the row is
         # not trustworthy, which is not the same as nothing being wrong.
         return None, (
             f"The last maintenance run ({run_id}) exited 2 but lists no fired alert; "
             "the row disagrees with itself."
-        )
-    return bool(fired), None
+        ), ()
+    if exit_code == 0 and fired:
+        return None, (
+            f"The last maintenance run ({run_id}) exited 0 but lists "
+            f"{', '.join(fired)} as fired; the row disagrees with itself."
+        ), ()
+    return bool(fired), None, tuple(fired)
 
 
 def compute_trigger_decision(
@@ -216,6 +271,7 @@ def compute_trigger_decision(
         "modified_count": None,
         "published_url_count": None if published_urls is None else len(published_urls),
         "live_url_count": None if live_urls is None else len(live_urls),
+        "fired_alerts": None,
     }
 
     if published_problem is not None:
@@ -239,12 +295,18 @@ def compute_trigger_decision(
                 f"{CHANGE_RATIO_CEILING:.0%} ceiling."
             )
 
-    alerts_open, alerts_problem = _alerts_open(maintenance_log_path)
+    alerts_open, alerts_problem, fired_alerts = _alerts_open(maintenance_log_path)
+    detail["fired_alerts"] = list(fired_alerts) if alerts_open is not None else None
     if alerts_problem is not None:
         undetermined.append(alerts_problem)
     elif alerts_open:
         fires = True
-        reasons.append("A T34 maintenance alert is open on the last run.")
+        # Named, not just counted: the trigger log row is the only diagnosis
+        # the reader gets, and "an alert is open" sends them to another file
+        # to find out which one.
+        reasons.append(
+            f"A T34 maintenance alert is open on the last run: {', '.join(fired_alerts)}."
+        )
 
     return TriggerDecision(
         fires=fires,

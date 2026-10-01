@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from mcrag.maintain import trigger
+from mcrag.maintain.alerts import ALL_CHECK_NAMES, ALL_CHECKS
 from mcrag.maintain.frozen import frozen_config
 from mcrag.maintain.trigger import (
     TriggerDecision,
@@ -554,6 +556,18 @@ def _urls(n: int, *, changed: int = 0, added: int = 0, removed: int = 0) -> dict
     return urls
 
 
+def _alerts(*fired: str) -> list[dict]:
+    """A complete verdict set, with the named checks fired.
+
+    Derived from ALL_CHECK_NAMES, not hardcoded: a fifth check added to
+    alerts.py has to show up in these rows too, or the trigger will rightly
+    call them incomplete.
+    """
+    for name in fired:
+        assert name in ALL_CHECK_NAMES, f"{name} is not a real check"
+    return [{"name": n, "fired": n in fired} for n in sorted(ALL_CHECK_NAMES)]
+
+
 def _clean_row(**overrides) -> dict:
     """A T34 log row for a run where all four checks ran and none fired."""
     row = {
@@ -714,7 +728,7 @@ def test_a_fired_alert_and_an_unmeasurable_ratio_both_reach_the_reader(tmp_path:
     monkeypatch.chdir(tmp_path)
     _repo(tmp_path, live=_urls(10), maintenance_row=_clean_row(
         exit_code=2,
-        alerts=[{"name": "stale_gold", "fired": True}],
+        alerts=_alerts("stale_gold"),
     ))
 
     assert trigger_module.main(rerun_fn=lambda config: None) == 2
@@ -897,3 +911,168 @@ def test_an_old_row_and_a_maintenance_rerun_row_both_survive_regeneration(tmp_pa
     written = out.read_text(encoding="utf-8")
     assert "bp_off-fixed512" in written
     assert "maintenance_rerun" in written
+
+
+# ============================================================================
+# From my own review of the rewrite: an incomplete verdict set read as silence
+# ============================================================================
+
+
+def test_an_incomplete_verdict_set_is_not_read_as_silence(tmp_path: Path):
+    """A row carrying two of the four checks does not mean nothing is wrong.
+
+    This is `decisions/0021` one level up. That decision is about four alert
+    instances three of which could not fire; this is a reader of their output
+    treating a row that carries fewer verdicts than there are checks as though
+    every check had run and found nothing. "No alert is open" is a claim about
+    the whole set.
+    """
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(
+        json.dumps(_clean_row(alerts=_alerts()[:2])) + "\n", encoding="utf-8"
+    )
+
+    answer, problem, fired = trigger._alerts_open(log)
+
+    assert answer is None
+    assert fired == ()
+    assert "2 of 4 checks" in problem
+    # The sentence names what is missing, because "incomplete" alone does not
+    # tell the reader which check to go and run.
+    assert "volume_anomaly" in problem
+
+
+def test_an_empty_verdict_list_is_not_read_as_silence(tmp_path: Path):
+    """The worst case of the above: exit 0 and no verdicts at all."""
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(json.dumps(_clean_row(alerts=[])) + "\n", encoding="utf-8")
+
+    answer, problem, _ = trigger._alerts_open(log)
+
+    assert answer is None
+    assert "0 of 4 checks" in problem
+
+
+def test_a_verdict_without_a_boolean_is_not_read_as_not_fired(tmp_path: Path):
+    """`entry.get("fired")` on a malformed entry is None, and None is falsy.
+
+    An alert dict with no `fired` key, or a non-boolean one, used to count as
+    a check that ran and found nothing -- which is the one reading the data
+    does not support.
+    """
+    log = tmp_path / "maintenance_log.jsonl"
+    for bad in ({"name": "stale_gold"}, {"name": "stale_gold", "fired": "no"}):
+        alerts = [a for a in _alerts() if a["name"] != "stale_gold"] + [bad]
+        log.write_text(json.dumps(_clean_row(alerts=alerts)) + "\n", encoding="utf-8")
+
+        answer, problem, _ = trigger._alerts_open(log)
+
+        assert answer is None, f"{bad} read as a verdict"
+        assert "no boolean verdict" in problem
+
+
+def test_a_non_object_in_the_alert_list_is_not_skipped_quietly(tmp_path: Path):
+    """Skipping the junk and reading the rest would answer from a broken row."""
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(
+        json.dumps(_clean_row(alerts=["garbage"] + _alerts())) + "\n", encoding="utf-8"
+    )
+
+    answer, problem, _ = trigger._alerts_open(log)
+
+    assert answer is None
+    assert "non-object entry" in problem
+
+
+def test_an_exit_0_row_listing_a_fired_alert_is_not_read_as_silence(tmp_path: Path):
+    """The mirror of the exit-2-with-nothing-fired case.
+
+    T34 computes its exit code from the verdicts, so the two cannot disagree
+    in a row it wrote. A row where they disagree was not written by the code
+    this trigger trusts, and it cannot license either answer.
+    """
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(
+        json.dumps(_clean_row(exit_code=0, alerts=_alerts("volume_anomaly"))) + "\n",
+        encoding="utf-8",
+    )
+
+    answer, problem, _ = trigger._alerts_open(log)
+
+    assert answer is None
+    assert "exited 0 but lists volume_anomaly as fired" in problem
+
+
+def test_an_unreadable_maintenance_log_is_undetermined_not_a_crash(tmp_path: Path):
+    """An OSError on the log read is exit 3, like an unreadable lock.
+
+    `_read_lock` catches OSError and reports the condition unmeasurable. The
+    log read did not, so a permission error on one file crashed the run to
+    exit 1 while the same error on the other file exited 3 -- two different
+    events for a reader, with nothing to distinguish them by.
+    """
+    # A directory where a file is expected: read_text raises OSError.
+    log = tmp_path / "maintenance_log.jsonl"
+    log.mkdir(parents=True)
+
+    assert trigger._read_last_maintenance_log(log) is None
+
+    answer, problem, _ = trigger._alerts_open(log)
+    assert answer is None
+    assert "unreadable" in problem
+
+
+def test_a_firing_alert_is_named_in_the_reason_and_the_detail(tmp_path: Path):
+    """The trigger log row is the only diagnosis the reader gets.
+
+    "A T34 alert is open" sends them to another file to learn which one, and
+    the names were already computed and thrown away.
+    """
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(
+        json.dumps(_clean_row(exit_code=2, alerts=_alerts("stale_gold", "volume_anomaly")))
+        + "\n",
+        encoding="utf-8",
+    )
+    lock = tmp_path / "corpus.lock"
+    lock.write_text(json.dumps({"snapshot_hash": "h", "urls": _urls(10)}), encoding="utf-8")
+
+    decision = compute_trigger_decision(
+        published_lock_path=lock, live_lock_path=lock, maintenance_log_path=log
+    )
+
+    assert decision.fires is True
+    assert any("stale_gold" in r and "volume_anomaly" in r for r in decision.reasons)
+    assert decision.detail["fired_alerts"] == ["stale_gold", "volume_anomaly"]
+
+
+def test_fired_alerts_is_unknown_not_empty_when_the_status_is_unknown(tmp_path: Path):
+    """`[]` would say four checks ran and none fired. None says nobody knows."""
+    log = tmp_path / "maintenance_log.jsonl"
+    log.write_text(json.dumps(_clean_row(alerts=[])) + "\n", encoding="utf-8")
+    lock = tmp_path / "corpus.lock"
+    lock.write_text(json.dumps({"snapshot_hash": "h", "urls": _urls(10)}), encoding="utf-8")
+
+    decision = compute_trigger_decision(
+        published_lock_path=lock, live_lock_path=lock, maintenance_log_path=log
+    )
+
+    assert decision.alerts_open is None
+    assert decision.detail["fired_alerts"] is None
+
+
+def test_the_trigger_and_the_run_read_the_same_check_set(tmp_path: Path):
+    """One source of truth, so a fifth check cannot reach one and not the other.
+
+    The trigger decides whether a row is complete by counting against
+    ALL_CHECK_NAMES; the maintenance run builds its checks from ALL_CHECKS. If
+    those two ever stopped being the same set, a complete row would read as
+    incomplete forever, or an incomplete one as complete.
+    """
+    assert ALL_CHECK_NAMES == frozenset(c.name for c in ALL_CHECKS)
+    assert len(ALL_CHECK_NAMES) == len(ALL_CHECKS) == 4
+
+    source = Path("mcrag/maintain/run.py").read_text(encoding="utf-8")
+    # The run must not rebuild the list by hand beside the canonical one.
+    assert "ALL_CHECKS" in source
+    assert "ExtractionRegressionCheck()" not in source
