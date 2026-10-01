@@ -139,7 +139,10 @@ ablation table, not the demo, is the centerpiece.
 ## Status
 
 Backend complete through Checkpoint F, plus Phase 6b service hardening
-(Checkpoint 6b). The live-quota checks have now been run against real
+(Checkpoint 6b). **Checkpoint G closed 2026-09-30**, with its "demo recorded"
+criterion struck by an amendment logged in `decisions/0019` — the gate's own
+second criterion already made the ablation table the centerpiece and the demo
+secondary. `RESULTS.md` and `results_pareto.svg` regenerate byte-identically. The live-quota checks have now been run against real
 `gemma4:31b`: `curl -N POST /ask` over real SSE, a 16-case injection regression
 (`docs/injection_regression_report.md`), and the streaming timing measurement —
 which **failed its claim**, so the "sources arrive at least 1 s before the first
@@ -156,6 +159,11 @@ pre-registered primary too. Under the stopping rule that closes the labelling ro
 frozen prompt stands unchanged and layer 5 ships with its blind spot measured and
 documented rather than patched.
 
-Not yet done: the recorded demo (T33) and Phase 7 maintenance.
-The reference client's real-browser pass covered the zero-quota demo server only.
+Not yet done: the recorded demo (T33) and Phase 7 maintenance. **No demo
+exists** — closing Checkpoint G without it says the portfolio artifacts are done,
+not that the project has a walkthrough. T33 also has a real blocker beyond
+scheduling: the `TAU` gate refuses every cross-silo dev question, so the
+cross-silo third of that walkthrough has nothing to show until the over-refusal
+is addressed. The reference client's real-browser pass covered the zero-quota demo
+server only, and sources-render-before-answer is measured (T42), never filmed.
 Everything open is recorded in `tasks/plan.md` rather than claimed.

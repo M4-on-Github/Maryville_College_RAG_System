@@ -59,8 +59,8 @@ Design rationale lives in `PLAN.md`.
 - [x] T30 · Results table generator from `runs/` (M) — cost column (median wall_s), 3a/3c control markers, deterministic SVG Pareto frontier; byte-identical regeneration verified
 - [x] T31 · Architecture diagram + README (S) — clean-clone setup verified; README gaps fixed
 - [x] T32 · Limitations + writeup (M) — `docs/LIMITATIONS.md`
-- [ ] T33 · Recorded demo walkthrough (S)
-- [ ] **Checkpoint G** — shipped
+- [ ] T33 · Recorded demo walkthrough (S) — **still open.** Needs a human with a screen recorder, and needs the `TAU` gate over-refusal dealt with first: no cross-silo dev question currently passes it, so the cross-silo third of the walkthrough has nothing to show. Deliberately **not** folded into Checkpoint G's close.
+- [x] **Checkpoint G** — closed 2026-09-30 with criterion 1 **amended** to drop "demo recorded" (`decisions/0019`). `RESULTS.md` regenerated (it was stale — missing the T41/T41b runs) and byte-identical on re-run, limitations current to T41b, ablation table is the centerpiece. No demo is claimed.
 
 ## Phase 6b — Service hardening
 - [x] T37 · Scan corpus for indirect-injection text (S) — free

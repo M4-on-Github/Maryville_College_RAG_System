@@ -144,7 +144,7 @@ T1 config+run-log ──┬── T2 robots+ratelimit ── T4 manifest ── 
                                             v   [Checkpoint F — backend done]
                           T30 results table ── T31 README ── T32 limitations
                                     │                     └── T33 demo
-                                    v   [Checkpoint G — shipped]
+                                    v   [Checkpoint G — closed, T33 open]
                           T34 re-crawl + alerts ── T35 gold staleness
                                     └── T36 re-run trigger
 ```
@@ -1277,9 +1277,23 @@ decided it is a new client against a frozen contract.
 
 **Dependencies:** T29, T31 · **Scope:** S
 
-### ✅ Checkpoint G — shipped
-- [ ] `RESULTS.md` generated, limitations written, demo recorded
-- [ ] Ablation table is the centerpiece, not the demo
+### ✅ Checkpoint G — shipped (closed 2026-09-30, **criterion 1 amended**)
+- [x] `RESULTS.md` generated, limitations written ~~, demo recorded~~
+- [x] Ablation table is the centerpiece, not the demo
+
+**Amendment, logged in `decisions/0019`:** "demo recorded" was struck from criterion 1
+on the owner's explicit decision. The gate's own second criterion already says the
+ablation table is the centerpiece and the demo is not, so criterion 1 was blocking the
+checkpoint on the item its next line calls secondary. **T33 stays open and unticked**
+below — no demo is claimed anywhere, and the two real blockers are recorded: no video
+capture in the working environment, and the `TAU` gate refusing every cross-silo dev
+question, which means the middle third of T33's first criterion currently has nothing
+to film. Verified at close, not inherited: `RESULTS.md` **regenerated** (it was stale —
+it predated the T41/T41b runs, which now appear in the table and the Pareto section),
+`RESULTS.md` and `results_pareto.svg` byte-identical on a second regeneration,
+`docs/LIMITATIONS.md` current to T41b, suite 734 passed. Not claimed: any end-to-end
+walkthrough visible to a human, and sources-render-before-answer on camera — the latter
+is measured in T42, which is not the same thing.
 
 
 ---
