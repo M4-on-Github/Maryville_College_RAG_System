@@ -141,8 +141,17 @@ before any token, citations spliced at the server's `claim_span` offsets, a
 refusal built from `office`/`contact_url`/`email` rather than from prose, a
 `null` latency stage shown as `—` rather than `0 ms`, and SSE read over `fetch`
 rather than `EventSource`. It needs `node`; `pytest` does not run it, and
-nothing else in the repo depends on node. Neither client has yet been driven in
-a real browser against live `gemma4:31b` — that gap is unchanged.
+nothing else in the repo depends on node.
+
+`clients/chat.html` **has** now been opened in a real browser, against the
+zero-quota demo server — enough to catch two things the DOM shim could not: a
+clipped two-line placeholder in the composer, and the fact that a stream whose
+body ends without a `done` event was reading as a finished answer and banking
+the question into the conversation memory. Both are fixed, and the second is
+now check 11 in the verifier. What is still unverified in a browser is the part
+that needs quota: **no client has been driven against live `gemma4:31b`**, so a
+real answer's tokens, citation markers, and timings have never been watched
+arrive. That gap is unchanged.
 
 ## Results
 

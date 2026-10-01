@@ -299,13 +299,13 @@
 
 <footer>
   <form class="composer" id="composer">
-    <textarea id="question" rows="1" placeholder="Ask a question&#10;Enter to send · Shift+Enter for a new line"
-              aria-label="Your question"></textarea>
+    <textarea id="question" rows="1" placeholder="Ask a question…" aria-label="Your question"></textarea>
     <button id="send" type="submit">Send</button>
     <button id="stop" type="button" hidden>Stop</button>
   </form>
-  <p class="hint">The conversation is held in this page only — the server keeps no session
-     (Task 28). The API key stays in memory and is never stored.</p>
+  <p class="hint">Enter to send · Shift+Enter for a new line. The conversation is held in this
+     page only — the server keeps no session (Task 28). The API key stays in memory and is
+     never stored.</p>
 </footer>
 
 <script>
@@ -396,6 +396,9 @@ function newTurn(question) {
     cites: [],
     chunks: [],
     priorTurns: history.length,
+    // `done` is mandatory in the contract, so its absence is not a quiet
+    // edge case -- it means the stream was cut off mid-answer.
+    sawDone: false,
     started: performance.now(),
   };
 }
@@ -503,6 +506,7 @@ function onRefusal(t, data) {
 }
 
 function onDone(t, data) {
+  t.sawDone = true;
   t.answer.removeAttribute("aria-busy");
   t.meta.hidden = false;
   t.meta.replaceChildren(
@@ -604,10 +608,18 @@ async function ask(question) {
       }
     }
 
+    // The body can end cleanly without `done` ever arriving -- an upstream
+    // generation connection torn mid-answer terminates the SSE body with no
+    // terminal event. Treated as a failure rather than as an answer: otherwise
+    // a truncated reply reads as a finished one, minus only its timings row.
+    if (!t.sawDone) {
+      throw new Error("The stream ended before the answer was finished, so the text above is incomplete.");
+    }
+
     // A turn joins the memory once its stream completed -- refused or not,
-    // since a refusal is still something the student asked. An aborted or
-    // failed turn does not, so the history never claims a turn the server
-    // never finished answering.
+    // since a refusal is still something the student asked. An aborted,
+    // failed, or truncated turn does not, so the history never claims a turn
+    // the server never finished answering.
     history.push(question);
     $("turncount").textContent = `${history.length} turn${history.length === 1 ? "" : "s"} held in this page`;
   } catch (err) {

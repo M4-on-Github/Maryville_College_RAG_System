@@ -448,4 +448,30 @@ const ok = (name) => { checks++; console.log("  PASS  " + name); };
   ok("property 5 — hand-rolled SSE over fetch, same-origin, key in a header");
 }
 
+// ---- a stream that ends without `done` is a failure, not an answer -------
+{
+  // An upstream generation connection torn mid-answer ends the SSE body with
+  // no terminal event (`mcrag/generate/ollama_cloud.py` raises GenerationError
+  // out of the service's stream, and FastAPI just stops writing). A truncated
+  // reply must not read as a finished one, and the question must not join the
+  // memory -- otherwise the next turn is decontextualized against an answer
+  // the server never actually finished giving.
+  const t = C.newTurn("q");
+  const truncated = FRAMES.turn1.filter(([type]) => type !== "done");
+  assert.ok(truncated.length < FRAMES.turn1.length, "the fixture has no done frame to drop");
+  for (const [type, data] of truncated) C.HANDLERS[type]?.(t, data);
+  assert.equal(t.sawDone, false, "no done frame arrived, so the turn must not be marked complete");
+  // The guard itself lives inside `ask()`'s fetch loop, which the DOM shim
+  // does not drive, so it is read out of the source rather than executed.
+  const guard = src.indexOf("if (!t.sawDone)");
+  const push = src.indexOf("history.push(question)");
+  assert.ok(guard > -1, "ask() must guard on sawDone before banking the turn");
+  assert.ok(push > guard, "the guard must run before the turn joins the memory");
+  assert.ok(
+    /if \(!t\.sawDone\) \{\s*throw new Error/.test(src),
+    "a stream with no `done` must throw rather than fall through",
+  );
+  ok("a stream that never sent `done` fails the turn instead of banking it");
+}
+
 console.log(`\n${checks} checks passed`);
