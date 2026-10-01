@@ -52,11 +52,25 @@ def _load_run(run_path: Path) -> dict[str, Any] | None:
 
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+
+    # Task 36: Load the corpus.lock digest if it exists
+    corpus_digest = "?"
+    corpus_lock_path = run_path / "corpus.lock"
+    if corpus_lock_path.exists():
+        try:
+            corpus_lock = json.loads(corpus_lock_path.read_text(encoding="utf-8"))
+            digest = corpus_lock.get("digest", "?")
+            # Truncate to 16 characters (D13)
+            corpus_digest = digest[:16] if digest else "?"
+        except Exception:
+            corpus_digest = "?"
+
     return {
         "run_id": run_path.name,
         "config": config,
         "metrics": metrics,
         "wall_s": _per_query_wall_s(run_path / "per_query.jsonl"),
+        "corpus_digest": corpus_digest,
     }
 
 
@@ -117,6 +131,10 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
     with improved retrieval performance. A `?` there means the run never
     checked -- runs recorded before pinning existed, and any run whose caller
     passed `stale_qids=None` -- and is deliberately not shown as `0`.
+
+    Task 36: the `corpus` column shows the run's corpus.lock digest, truncated
+    to 16 characters, and `?` when not found. This allows rows from different
+    corpus snapshots to be distinguished.
     """
     lines = [
         "# RESULTS",
@@ -127,14 +145,15 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
         "mean) with mean completion tokens; `--` means the run made no generation "
         "calls. Quality cells are `value [95% CI] (n=questions)`.",
         "",
-        "| run | arm | role | split | scored / stale | " + " | ".join(METRIC_COLUMNS) + " | faithfulness | cost |",
-        "|---" * (5 + len(METRIC_COLUMNS) + 2) + "|",
+        "| run | arm | role | split | corpus | scored / stale | " + " | ".join(METRIC_COLUMNS) + " | faithfulness | cost |",
+        "|---" * (6 + len(METRIC_COLUMNS) + 2) + "|",
     ]
     for run in runs:
         config = run["config"]
         metrics = run["metrics"]
         arm = config.get("arm") or config.get("name") or "?"
         split = (config.get("eval") or {}).get("split") or "?"
+        corpus_digest = run.get("corpus_digest", "?")
         run_info = metrics.get("run", {})
         n_scored = run_info.get("n_scored", "?")
         # Task 35: a run from before pinning existed never checked for decay, so
@@ -144,7 +163,7 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
         n_stale = run_info.get("n_stale") or "?"
         if n_stale == "unchecked":
             n_stale = "?"
-        row = [run["run_id"], arm, run_role(run), split, f"{n_scored}/{n_stale}"]
+        row = [run["run_id"], arm, run_role(run), split, corpus_digest, f"{n_scored}/{n_stale}"]
         row.extend(_fmt_metric(metrics, key) for key in METRIC_COLUMNS)
         row.extend([_fmt_metric(metrics, "faithfulness"), _fmt_cost(run)])
         lines.append("| " + " | ".join(row) + " |")
