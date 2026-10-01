@@ -111,6 +111,12 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
     next to quality. Cost is `--` for retrieval-only runs: they spend no
     generation quota, and a made-up 0 would plot as a free lunch. Controls are
     marked in the `role` column. A run with no `arm` name falls back to `name`.
+
+    Task 35: the stale count (`n_stale`) is reported next to `n_scored` as
+    `scored / stale`, so a shrinking denominator is never silently conflated
+    with improved retrieval performance. A `?` there means the run never
+    checked -- runs recorded before pinning existed, and any run whose caller
+    passed `stale_qids=None` -- and is deliberately not shown as `0`.
     """
     lines = [
         "# RESULTS",
@@ -121,15 +127,24 @@ def render_markdown(runs: list[dict[str, Any]]) -> str:
         "mean) with mean completion tokens; `--` means the run made no generation "
         "calls. Quality cells are `value [95% CI] (n=questions)`.",
         "",
-        "| run | arm | role | split | " + " | ".join(METRIC_COLUMNS) + " | faithfulness | cost |",
-        "|---" * (4 + len(METRIC_COLUMNS) + 2) + "|",
+        "| run | arm | role | split | scored / stale | " + " | ".join(METRIC_COLUMNS) + " | faithfulness | cost |",
+        "|---" * (5 + len(METRIC_COLUMNS) + 2) + "|",
     ]
     for run in runs:
         config = run["config"]
         metrics = run["metrics"]
         arm = config.get("arm") or config.get("name") or "?"
         split = (config.get("eval") or {}).get("split") or "?"
-        row = [run["run_id"], arm, run_role(run), split]
+        run_info = metrics.get("run", {})
+        n_scored = run_info.get("n_scored", "?")
+        # Task 35: a run from before pinning existed never checked for decay, so
+        # its stale count is `?` -- the same thing the module already prints for
+        # an unknown split. Defaulting it to 0 would publish "no decay" on the
+        # strength of nobody having looked.
+        n_stale = run_info.get("n_stale") or "?"
+        if n_stale == "unchecked":
+            n_stale = "?"
+        row = [run["run_id"], arm, run_role(run), split, f"{n_scored}/{n_stale}"]
         row.extend(_fmt_metric(metrics, key) for key in METRIC_COLUMNS)
         row.extend([_fmt_metric(metrics, "faithfulness"), _fmt_cost(run)])
         lines.append("| " + " | ".join(row) + " |")

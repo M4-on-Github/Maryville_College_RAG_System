@@ -32,9 +32,22 @@ claim that it was unnecessary.
 
 Two reasons, both recorded rather than smoothed over:
 
-1. **No recording capability in the working environment.** The assistant doing the work
-   cannot capture video, and the Chrome extension was not connected in the sessions where
+1. **No recording capability in the working environment.** ~~The assistant doing the work
+   cannot capture video~~, and the Chrome extension was not connected in the sessions where
    this came up. T33 is a human task, not a deferred automation task.
+
+   **Amended 2026-10-01.** The struck clause was wrong, and overstated in a direction that
+   made the drop look more forced than it was. The assistant *can* capture video whenever a
+   browser is attached — the Chrome extension exposes a GIF recorder — and in this session
+   the extension connected on a retry after a first attempt reported it absent. So the
+   recording capability existed, or would have on a retry, in at least some of the sessions
+   this point described. Point 1 should have read: the extension was not connected *at the
+   time*, and that was not re-checked. It is corrected here rather than quietly rewritten,
+   because a decision doc that softens its own stated reasons after the fact is worth less
+   than one that shows them being wrong.
+
+   This changes nothing about the close. Point 2 was already the load-bearing reason, and
+   it is untouched: a recorder with nothing to record is still nothing to record.
 2. **A substantive blocker that predates the scheduling question.** T33 requires a
    cross-silo question demonstrated end to end, and the `TAU` gate refuses heavily — no
    cross-silo dev question has been found that passes it. So even with a camera, the

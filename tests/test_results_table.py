@@ -168,3 +168,34 @@ def test_regeneration_is_byte_identical(tmp_path):
     (tmp_path / "results_pareto.svg").unlink()
     write_results_md(runs, out)
     assert first == (out.read_bytes(), (tmp_path / "results_pareto.svg").read_bytes())
+
+
+def _write_metrics(root: Path, run_id: str, run_block: dict) -> None:
+    """A run dir identical to `_make_run`'s but with an explicit `run` block."""
+    _make_run(root, run_id, "dense-only", "dev", 0.7)
+    path = root / run_id / "metrics.json"
+    metrics = json.loads(path.read_text(encoding="utf-8"))
+    metrics["run"] = run_block
+    path.write_text(json.dumps(metrics), encoding="utf-8")
+
+
+def test_a_run_that_never_checked_for_decay_shows_a_question_mark(tmp_path: Path):
+    """T35: `?`, not `0`. "No decay" and "nobody looked" are different claims."""
+    # A run recorded before pinning existed: no `n_stale` key at all.
+    _write_metrics(tmp_path, "20260101T000000Z_old", {"n_scored": "60", "n_skipped": "0"})
+    # A run whose caller passed stale_qids=None: the harness wrote it down.
+    _write_metrics(
+        tmp_path,
+        "20260102T000000Z_def",
+        {"n_scored": "60", "n_stale": "unchecked", "n_skipped": "0"},
+    )
+    md = render_markdown(collect_runs(tmp_path))
+    assert md.count("| 60/? |") == 2
+    assert "60/0" not in md
+    assert "unchecked" not in md  # rendered as `?`, not leaked as a word
+
+
+def test_a_checked_run_shows_its_real_stale_count(tmp_path: Path):
+    _write_metrics(tmp_path, "20260103T000000Z_checked", {"n_scored": "58", "n_stale": "2"})
+    md = render_markdown(collect_runs(tmp_path))
+    assert "| 58/2 |" in md

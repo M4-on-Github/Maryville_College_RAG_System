@@ -34,6 +34,7 @@ def evaluate_question(
     *,
     retrieved_lookup: dict[str, Chunk] | None = None,
     gold_lookup: dict[str, Chunk] | None = None,
+    stale_qids: set[str] | None = None,
 ) -> dict[str, Any]:
     """One question's retrieval metrics, or a skip record if it has no gold.
 
@@ -44,7 +45,18 @@ def evaluate_question(
     as a gold chunk -- just under a different id -- is still counted as a
     hit (`mcrag.eval.chunk_alignment`). Omit both to score a retriever
     against its own native chunking with plain exact-id matching.
+
+    `stale_qids` is an optional set of question IDs to exclude from evaluation.
+    If a question's ID is in this set, it is skipped with reason "stale".
     """
+    stale_qids = stale_qids or set()
+    if question.qid in stale_qids:
+        return {
+            "query_id": question.qid,
+            "slice": question.slice,
+            "conjunctive": question.conjunctive,
+            "skipped": "stale",
+        }
     if not question.gold:
         return {
             "query_id": question.qid,
@@ -76,7 +88,9 @@ def _aggregate(records: list[dict[str, Any]], metric: str, seed: int) -> Interva
     return bootstrap_ci(values, statistic=statistics.mean, name="mean", seed=seed)
 
 
-def summarize(records: list[dict[str, Any]], seed: int = 42) -> dict[str, Any]:
+def summarize(
+    records: list[dict[str, Any]], seed: int = 42, *, stale_checked: bool = False
+) -> dict[str, Any]:
     """Overall and per-slice metrics, each as a `{value,ci_low,ci_high,n}` Interval.
 
     Every leaf here is an `Interval.to_dict()` -- `RunDir.write_metrics` rejects
@@ -90,12 +104,23 @@ def summarize(records: list[dict[str, Any]], seed: int = 42) -> dict[str, Any]:
     burying it inside the overall average would hide exactly the number the
     project's central claim depends on. Its own `n` (inside the Interval) is
     the conjunctive count -- no separate bare count needed.
+
+    Task 35: stale questions are reported as a separate count under
+    `run.n_stale`, so that a shrinking denominator is never silently conflated
+    with improved retrieval performance. `stale_checked` says whether anyone
+    actually looked: when it is false, `n_stale` reads `unchecked` rather than
+    `0`, because a run nobody checked for decay is not a run with no decay --
+    the same reason a latency stage that did not run reports null and never
+    0.0 (`docs/stream_contract.md`).
     """
     scored = [r for r in records if "skipped" not in r]
+    stale = [r for r in records if r.get("skipped") == "stale"]
+    all_skipped = [r for r in records if "skipped" in r]
     summary: dict[str, Any] = {
         "run": {
             "n_scored": str(len(scored)),
-            "n_skipped": str(len(records) - len(scored)),
+            "n_stale": str(len(stale)) if stale_checked else "unchecked",
+            "n_skipped": str(len(all_skipped)),  # Total skipped (backward compat)
         }
     }
     for metric in METRIC_NAMES:
@@ -127,10 +152,19 @@ def run(
     *,
     retrieved_lookup: dict[str, Chunk] | None = None,
     gold_lookup: dict[str, Chunk] | None = None,
+    stale_qids: set[str] | None,
 ) -> dict[str, Any]:
     """Score every question, resuming from `run_dir` if it already has records.
 
     See `evaluate_question` for `retrieved_lookup`/`gold_lookup`.
+
+    `stale_qids` is required rather than defaulted (Task 35): the whole point
+    of pinning is that no eval gets scored without someone facing the decay
+    number, and a default would let every existing caller keep not facing it.
+    Pass the set from `gold.find_stale_questions` to exclude those questions,
+    an empty set to say "checked, nothing stale", or an explicit `None` to say
+    "not checked" -- which is recorded as `n_stale: unchecked` in the metrics
+    and `?` in RESULTS.md rather than being rounded down to zero.
     """
     done = run_dir.completed_ids()
     for question in questions:
@@ -138,11 +172,16 @@ def run(
             continue
         run_dir.append(
             evaluate_question(
-                retriever, question, k, retrieved_lookup=retrieved_lookup, gold_lookup=gold_lookup
+                retriever,
+                question,
+                k,
+                retrieved_lookup=retrieved_lookup,
+                gold_lookup=gold_lookup,
+                stale_qids=stale_qids or set(),
             )
         )
 
     records = list(run_dir.records())
-    metrics = summarize(records, seed=seed)
+    metrics = summarize(records, seed=seed, stale_checked=stale_qids is not None)
     run_dir.write_metrics(metrics)
     return metrics

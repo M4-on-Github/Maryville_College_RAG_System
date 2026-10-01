@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
-from datetime import datetime, timezone
+import pytest
 
 from mcrag.config import Config
 from mcrag.eval.retrieval_harness import evaluate_question, run, summarize
@@ -97,6 +98,17 @@ def test_summarize_excludes_skipped_from_scored_metrics():
     assert summary["run"]["n_scored"] == "1"
     assert summary["run"]["n_skipped"] == "1"
     assert summary["recall@k"]["n"] == 1
+    # Nobody passed a stale set, so the count says so rather than reading 0 --
+    # "no decay" and "nobody checked for decay" are different claims (T35).
+    assert summary["run"]["n_stale"] == "unchecked"
+
+
+def test_run_requires_the_caller_to_face_the_stale_question(tmp_path: Path):
+    """`run` has no default for `stale_qids`; forgetting it is a TypeError."""
+    config = Config.from_dict({"name": "t35-required", "retrieval": {"k": 3}})
+    run_dir = RunDir.create(config, root=tmp_path)
+    with pytest.raises(TypeError):
+        run(_FakeRetriever({}), [], k=3, run_dir=run_dir)  # type: ignore[call-arg]
 
 
 def test_run_writes_a_valid_run_dir_and_is_resumable(tmp_path: Path):
@@ -108,8 +120,9 @@ def test_run_writes_a_valid_run_dir_and_is_resumable(tmp_path: Path):
     ]
 
     run_dir = RunDir.create(config, root=tmp_path)
-    metrics = run(retriever, questions, k=3, run_dir=run_dir)
+    metrics = run(retriever, questions, k=3, run_dir=run_dir, stale_qids=set())
     assert metrics["run"]["n_scored"] == "2"
+    assert metrics["run"]["n_stale"] == "0"
     assert (run_dir.path / "metrics.json").exists()
     assert (run_dir.path / "per_query.jsonl").exists()
 
@@ -118,5 +131,7 @@ def test_run_writes_a_valid_run_dir_and_is_resumable(tmp_path: Path):
     # silently change the numbers if it reran).
     reopened = RunDir.open(run_dir.path)
     second_pass_retriever = _FakeRetriever({})  # would score everything 0 if re-run
-    metrics_again = run(second_pass_retriever, questions, k=3, run_dir=reopened)
+    metrics_again = run(
+        second_pass_retriever, questions, k=3, run_dir=reopened, stale_qids=set()
+    )
     assert metrics_again == metrics

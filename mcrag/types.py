@@ -96,6 +96,29 @@ class Hit:
 
 
 @dataclass(frozen=True, slots=True)
+class Pin:
+    """Content-hash pin for a gold reference (Task 35).
+
+    Records the hash of the page a gold reference was read from, along with
+    how that pin was established. This lets the eval detect when a page has
+    changed since the gold answer was authored or last re-verified.
+
+    `origin` is one of:
+    - "authored": the pin was established at authoring time (rare; pre-existing pins)
+    - "backfill": resolved from the current corpus (most pins initially)
+    - "reverified": re-established by a human re-read and re-verification
+
+    The origin matters for accountability: a pin asserts "this is what the page
+    looks like [as of when the origin says]", not "this is what the author read
+    at authoring time" unless origin is "authored".
+    """
+
+    gold_ref: str  # chunk ID like "6f879be008729f80-5"
+    content_hash: str  # sha256 of page the chunk came from
+    origin: str  # "authored" | "backfill" | "reverified"
+
+
+@dataclass(frozen=True, slots=True)
 class GoldQuestion:
     """One hand-authored gold-set record (Task 12).
 
@@ -118,6 +141,12 @@ class GoldQuestion:
     generates its own prior answers live during eval, so scripting them would
     test the pipeline against canned text it never produced. Empty for every
     other slice.
+
+    `pins` carries content-hash pins for each gold ref (Task 35). Maps each
+    ref to the hash of the page it was read from, along with how that pin was
+    established (authored/backfill/reverified). Absent or empty before Task 35;
+    progressively filled by backfill and re-verification. A pin exists when the
+    gold ref is not out-of-scope and the ref's chunk was successfully resolved.
     """
 
     qid: str
@@ -130,6 +159,7 @@ class GoldQuestion:
     split: str | None = None  # filled in by the splitter, absent before that
     provenance: str = "synthetic"
     history: tuple[str, ...] = ()
+    pins: tuple[Pin, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

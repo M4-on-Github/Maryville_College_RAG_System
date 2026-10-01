@@ -19,7 +19,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from mcrag.config import Config  # noqa: E402
-from mcrag.eval.gold import load_gold_questions, load_split_lock  # noqa: E402
+from mcrag.eval.gold import (  # noqa: E402
+    find_stale_questions,
+    load_chunks,
+    load_gold_questions,
+    load_split_lock,
+)
 from mcrag.eval.results_table import write_results_md  # noqa: E402
 from mcrag.eval.retrieval_harness import run  # noqa: E402
 from mcrag.retrieval.bge_embedder import MODEL_NAME, BgeEmbedder  # noqa: E402
@@ -124,6 +129,16 @@ def main() -> int:
     retrieved_lookup = load_chunk_lookup(BASELINE_CHUNKS_PATH)
     print(f"gold_lookup: {len(gold_lookup)} chunks, retrieved_lookup: {len(retrieved_lookup)} chunks")
 
+    # Task 35: check the pins before scoring anything. A question whose page has
+    # changed since its answer was read is no longer evidence about retrieval,
+    # so it drops out rather than being scored against a gold answer that may no
+    # longer be on the page -- and the count it drops into is printed, because a
+    # denominator that shrinks for reasons other than retrieval has to be visible.
+    stale = find_stale_questions(questions, load_chunks(GOLD_CHUNKS_PATH))
+    stale_qids = {s.qid for s in stale}
+    for record in stale:
+        print(f"stale: {record.qid} {record.gold_ref} {record.source_url}")
+
     metrics = run(
         dense,
         questions,
@@ -132,9 +147,14 @@ def main() -> int:
         seed=config.seed,
         retrieved_lookup=retrieved_lookup,
         gold_lookup=gold_lookup,
+        stale_qids=stale_qids,
     )
 
-    print(f"n_scored={metrics['run']['n_scored']} n_skipped={metrics['run']['n_skipped']}")
+    print(
+        f"n_scored={metrics['run']['n_scored']} "
+        f"n_stale={metrics['run']['n_stale']} "
+        f"n_skipped={metrics['run']['n_skipped']}"
+    )
     for key in ("recall@k", "mrr", "ndcg@k", "all_golds_retrieved@k"):
         m = metrics[key]
         print(f"{key}: {m['value']:.3f} [{m['ci_low']:.3f}, {m['ci_high']:.3f}] (n={m['n']})")
