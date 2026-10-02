@@ -16,7 +16,6 @@ uses the default that calls the real scripts.
 
 from __future__ import annotations
 
-import gzip
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -237,35 +236,56 @@ def _load_pinned_extractions(fixtures_dir: Path) -> tuple[dict[str, str], list[P
 
 
 def _load_pinned_http_status_and_extractions(
-    raw_store_path: Path, urls: Iterable[str]
-) -> tuple[dict[str, int], dict[str, str]]:
+    raw_store_path: Path, urls: Iterable[str], manifest: Manifest
+) -> tuple[dict[str, int], dict[str, str], list[str]]:
     """Re-extract each pinned URL from this run's raw snapshot.
 
     Takes the URLs resolved by `_load_pinned_extractions` rather than
     re-deriving them from the fixture directory: one derivation, used by both
     sides of the comparison, so the two maps cannot silently disagree on a key.
+
+    The page is rebuilt the way `extract_all` builds it: html from
+    `SnapshotStore.get`, everything else from the manifest record. A URL with
+    no manifest record or no snapshot is left out of both maps *and returned*
+    in the third element, so the caller can say how many pinned pages were
+    never looked at. Left out of `pinned_http_status`, it reads as "not
+    fetched" to the extraction check, which reports it as such -- it is never
+    given a status or an empty extraction it did not earn.
     """
     from mcrag.crawl.fetcher import SnapshotStore
+    from mcrag.types import RawPage
 
     store = SnapshotStore(raw_store_path)
     pinned_http_status: dict[str, int] = {}
     pinned_extractions: dict[str, str] = {}
+    unresolved: list[str] = []
 
     extractor = TrafilaturaExtractor()
 
     for url in urls:
+        record = manifest.records.get(url)
         try:
-            raw_page = store.load(url)
-        except (FileNotFoundError, gzip.BadGzipFile, json.JSONDecodeError):
-            # Snapshot absent or corrupt: this URL was not fetched this run.
+            html = store.get(url) if record is not None else None
+        except (OSError, EOFError, UnicodeDecodeError):
+            # gzip.BadGzipFile is an OSError. A snapshot that cannot be read
+            # is a page that was not looked at, not a page that was empty.
+            html = None
+        if record is None or html is None:
+            unresolved.append(url)
             continue
-        if not raw_page:
-            continue
-        pinned_http_status[url] = raw_page.http_status
-        doc = extractor.extract(raw_page)
+        http_status = record.http or 200
+        page = RawPage(
+            url=record.canonical_url,
+            http_status=http_status,
+            content_hash=record.content_hash or "",
+            fetched_at=record.fetched_at or datetime.now(timezone.utc),
+            html=html,
+        )
+        pinned_http_status[url] = http_status
+        doc = extractor.extract(page)
         pinned_extractions[url] = doc.text if doc else ""
 
-    return pinned_http_status, pinned_extractions
+    return pinned_http_status, pinned_extractions, unresolved
 
 
 def main(
@@ -316,66 +336,91 @@ def main(
     # Same rule: a chain that answered without the key did not report zero.
     pages_fetched = chain_result.get("pages_fetched")
 
-    # Assemble MaintenanceContext
-    fixtures_dir = Path("tests/fixtures/extraction")
-    raw_store_path = Path("corpus/raw")
+    # Everything between the chain and the log row is also guarded. It runs
+    # on the only path production takes, and before this guard a crash here
+    # wrote no row at all, which left the T36 trigger reading "no maintenance
+    # run has ever been logged" instead of "the last run failed".
+    try:
+        # Assemble MaintenanceContext
+        fixtures_dir = Path("tests/fixtures/extraction")
+        raw_store_path = Path("corpus/raw")
 
-    # Load manifests
-    previous_manifest_path = Path("corpus/.previous_manifest.jsonl")
-    current_manifest = Manifest.load(Path("corpus/manifest.jsonl"))
+        # Load manifests
+        previous_manifest_path = Path("corpus/.previous_manifest.jsonl")
+        current_manifest = Manifest.load(Path("corpus/manifest.jsonl"))
 
-    if previous_manifest_path.exists():
-        previous_manifest = Manifest.load(previous_manifest_path)
-        previous_records = list(previous_manifest.records.values())
-    else:
-        previous_records = []
+        if previous_manifest_path.exists():
+            previous_manifest = Manifest.load(previous_manifest_path)
+            previous_records = list(previous_manifest.records.values())
+        else:
+            previous_records = []
 
-    # Load expected extractions (from T6 fixtures), then re-extract exactly
-    # those URLs from this run's snapshots.
-    expected_extractions, unresolved = _load_pinned_extractions(fixtures_dir)
-    for path in unresolved:
-        print(f"pinned fixture has no resolvable url, not compared: {path.name}")
-    pinned_http_status, pinned_extractions = _load_pinned_http_status_and_extractions(
-        raw_store_path, expected_extractions
-    )
+        # Load expected extractions (from T6 fixtures), then re-extract exactly
+        # those URLs from this run's snapshots.
+        expected_extractions, unresolved = _load_pinned_extractions(fixtures_dir)
+        for path in unresolved:
+            print(f"pinned fixture has no resolvable url, not compared: {path.name}")
+        pinned_http_status, pinned_extractions, unresolved_pinned = (
+            _load_pinned_http_status_and_extractions(
+                raw_store_path, expected_extractions, current_manifest
+            )
+        )
+        if unresolved_pinned:
+            print(
+                f"{len(unresolved_pinned)} of {len(expected_extractions)} pinned "
+                "pages have no snapshot this run, not compared"
+            )
 
-    # Load gold questions and chunks (for Alert 4)
-    gold_path = Path("data/gold/gold_v1.jsonl")
-    chunks_path = Path("corpus/chunks.jsonl")
+        # Load gold questions and chunks (for Alert 4)
+        gold_path = Path("data/gold/gold_v1.jsonl")
+        chunks_path = Path("corpus/chunks.jsonl")
 
-    gold_questions = []
-    if gold_path.exists():
-        gold_questions = load_gold_questions(gold_path)
+        gold_questions = []
+        if gold_path.exists():
+            gold_questions = load_gold_questions(gold_path)
 
-    chunks = {}
-    if chunks_path.exists():
-        with chunks_path.open(encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    chunk = json.loads(line)
-                    chunks[chunk["chunk_id"]] = chunk
+        chunks = {}
+        if chunks_path.exists():
+            with chunks_path.open(encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        chunk = json.loads(line)
+                        chunks[chunk["chunk_id"]] = chunk
 
-    context = MaintenanceContext(
-        previous_manifest=previous_records,
-        current_manifest=list(current_manifest.records.values()),
-        pinned_extractions=pinned_extractions,
-        expected_extractions=expected_extractions,
-        pinned_http_status=pinned_http_status,
-        gold_questions=gold_questions,
-        chunks=chunks,
-    )
+        context = MaintenanceContext(
+            previous_manifest=previous_records,
+            current_manifest=list(current_manifest.records.values()),
+            pinned_extractions=pinned_extractions,
+            expected_extractions=expected_extractions,
+            pinned_http_status=pinned_http_status,
+            gold_questions=gold_questions,
+            chunks=chunks,
+        )
 
-    # Every check in the canonical set, which is also the set `trigger.py`
-    # requires a verdict from before it will read a row as "nothing is wrong".
-    checks = [check_cls() for check_cls in ALL_CHECKS]
+        # Every check in the canonical set, which is also the set `trigger.py`
+        # requires a verdict from before it will read a row as "nothing is wrong".
+        checks = [check_cls() for check_cls in ALL_CHECKS]
 
-    alerts: list[Alert] = []
-    any_fired = False
-    for check in checks:
-        alert = check.check(context)
-        alerts.append(alert)
-        if alert.fired:
-            any_fired = True
+        alerts: list[Alert] = []
+        any_fired = False
+        for check in checks:
+            alert = check.check(context)
+            alerts.append(alert)
+            if alert.fired:
+                any_fired = True
+
+    except Exception as exc:
+        append_maintenance_log(
+            Path("data/maintenance/maintenance_log.jsonl"),
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            exit_code=1,
+            pages_fetched=pages_fetched,
+            alerts=[],
+            error=f"{type(exc).__name__}: {exc}",
+        )
+        return 1
 
     # Write the log
     finished_at = datetime.now(timezone.utc)

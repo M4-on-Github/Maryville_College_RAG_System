@@ -1564,3 +1564,113 @@ def test_the_real_chain_rechunks_rather_than_replaying_the_old_chunk_file() -> N
 def test_the_chain_reports_what_it_did_and_main_logs_the_page_count() -> None:
     """Whatever the chain returns, `pages_fetched` is what reaches the log row."""
     assert "pages_fetched" in inspect.getsource(run_module._default_ingest_chain)
+
+
+# ============================================================================
+# The first live run crashed in code no test had ever executed
+# ============================================================================
+
+_PAGE_HTML = (
+    "<html><body><main><article><h1>Admissions</h1>"
+    + "".join(
+        f"<p>Maryville College admits students on a rolling basis, and section {i} "
+        "of the admissions guide explains the deadlines, the required documents, "
+        "the campus visit options and the financial aid timeline in detail.</p>"
+        for i in range(12)
+    )
+    + "</article></main></body></html>"
+)
+
+
+def _store_and_manifest(tmp_path: Path, urls_with_html: dict[str, str | None]):
+    """A real SnapshotStore and Manifest. A None html means no snapshot."""
+    from mcrag.crawl.fetcher import SnapshotStore
+    from mcrag.crawl.manifest import Manifest
+
+    store = SnapshotStore(tmp_path / "raw")
+    manifest = Manifest(path=tmp_path / "manifest.jsonl")
+    for i, (url, html) in enumerate(urls_with_html.items()):
+        manifest.consider(url, "sitemap")
+        if html is None:
+            continue
+        digest = f"{i:064x}"
+        store.put(url, html, digest)
+        manifest.mark_fetched(url, http=200, content_hash=digest, bytes_len=len(html))
+    store.save_index()
+    return tmp_path / "raw", manifest
+
+
+def test_pinned_lookup_extracts_from_a_real_snapshot(tmp_path: Path) -> None:
+    """The function crashed with AttributeError (`store.load` does not exist)
+    the first time it ran, because nothing had ever called it."""
+    url = "https://www.maryvillecollege.edu/admissions"
+    raw, manifest = _store_and_manifest(tmp_path, {url: _PAGE_HTML})
+
+    status, extractions, unresolved = run_module._load_pinned_http_status_and_extractions(
+        raw, [url], manifest
+    )
+
+    assert status == {url: 200}
+    assert "rolling basis" in extractions[url]
+    assert unresolved == []
+
+
+def test_pinned_lookup_reports_a_page_with_no_snapshot_instead_of_dropping_it(
+    tmp_path: Path,
+) -> None:
+    """A page nobody looked at must not get a status or an empty extraction,
+    and must be counted, not skipped silently."""
+    have = "https://www.maryvillecollege.edu/admissions"
+    lacks_snapshot = "https://www.maryvillecollege.edu/athletics"
+    not_in_manifest = "https://www.maryvillecollege.edu/unknown"
+    raw, manifest = _store_and_manifest(tmp_path, {have: _PAGE_HTML, lacks_snapshot: None})
+
+    status, extractions, unresolved = run_module._load_pinned_http_status_and_extractions(
+        raw, [have, lacks_snapshot, not_in_manifest], manifest
+    )
+
+    assert set(status) == {have}
+    assert set(extractions) == {have}
+    assert unresolved == [lacks_snapshot, not_in_manifest]
+
+
+def test_pinned_lookup_treats_a_corrupt_snapshot_as_unresolved(tmp_path: Path) -> None:
+    url = "https://www.maryvillecollege.edu/admissions"
+    raw, manifest = _store_and_manifest(tmp_path, {url: _PAGE_HTML})
+    for snapshot in raw.rglob("*"):
+        if snapshot.is_file() and snapshot.name != "index.json":
+            snapshot.write_bytes(b"not gzip")
+
+    status, extractions, unresolved = run_module._load_pinned_http_status_and_extractions(
+        raw, [url], manifest
+    )
+
+    assert (status, extractions, unresolved) == ({}, {}, [url])
+
+
+def test_a_crash_after_the_chain_still_writes_an_exit_1_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before the guard, a failure between the chain and the log row wrote no
+    row, so the trigger read 'no maintenance run has ever been logged' for a
+    run that had in fact failed."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "corpus").mkdir()
+    (tmp_path / "data" / "maintenance").mkdir(parents=True)
+    # corpus/manifest.jsonl is absent or unusable -> context assembly raises.
+    (tmp_path / "corpus" / "manifest.jsonl").write_text("{not json\n", encoding="utf-8")
+
+    code = run_module.main(ingest_chain=lambda: {"pages_fetched": 7})
+
+    assert code == 1
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "data/maintenance/maintenance_log.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert len(rows) == 1
+    assert rows[0]["exit_code"] == 1
+    assert rows[0]["pages_fetched"] == 7  # the chain did report it
+    assert rows[0]["alerts"] == []
+    assert rows[0]["error"]
