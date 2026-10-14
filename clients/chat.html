@@ -275,9 +275,6 @@
   <div class="brand">Maryville College Assistant
     <small id="turncount">no conversation yet</small>
   </div>
-  <label>API key
-    <input id="token" type="password" autocomplete="off" placeholder="X-API-Key">
-  </label>
   <button id="reset" title="Clears the conversation this client is holding">New conversation</button>
 </header>
 
@@ -304,8 +301,7 @@
     <button id="stop" type="button" hidden>Stop</button>
   </form>
   <p class="hint">Enter to send · Shift+Enter for a new line. The conversation is held in this
-     page only — the server keeps no session (Task 28). The API key stays in memory and is
-     never stored.</p>
+     page only; the server keeps no session.</p>
 </footer>
 
 <script>
@@ -568,14 +564,14 @@ async function ask(question) {
   try {
     const resp = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": $("token").value },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ question, history }),
       signal: controller.signal,
     });
 
     if (!resp.ok) {
       const why = resp.status === 401 || resp.status === 403
-        ? "The API key was rejected. Paste a valid key in the header and send again."
+        ? "The service rejected the request. Reload the page and try again."
         : resp.status === 429 ? "Rate limited by the service. Wait a moment and send again."
         : `The service answered HTTP ${resp.status}.`;
       throw new Error(why);
