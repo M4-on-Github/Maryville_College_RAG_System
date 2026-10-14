@@ -2,9 +2,10 @@ services:
   - type: web
     name: maryville-college-rag
     runtime: docker
-    # Two local models plus torch need roughly 2 GB of RAM; the 512 MB plans
-    # will be killed at startup. Check the current plan names and sizes.
-    plan: standard
+    # Free (512 MB). The Dockerfile runs int8 ONNX models, one at a time, but
+    # measured peak is ~480-510 MB: expect an occasional out-of-memory restart.
+    # Dockerfile.torch needs ~2 GB (a paid plan).
+    plan: free
     healthCheckPath: /health
     envVars:
       - key: OLLAMA_API_KEY

@@ -22,6 +22,7 @@ from mcrag.retrieval.dense import DenseIndex
 from mcrag.retrieval.embedding_cache import EmbeddingCache
 from mcrag.retrieval.fusion import RRFFuser
 from mcrag.retrieval.literal import LiteralIndex
+from mcrag.retrieval.onnx_models import OnnxBgeEmbedder, onnx_dir
 from mcrag.types import Chunk, Hit
 
 CHUNKS_PATH = Path("corpus/baseline_chunks_no_boilerplate.jsonl")
@@ -81,7 +82,8 @@ def build_indexes() -> tuple[DenseIndex, BM25Index, LiteralIndex, dict[str, Chun
     """
     chunks = load_chunks(CHUNKS_PATH)
     chunk_lookup = {c.chunk_id: c for c in chunks}
-    embedder = BgeEmbedder()
+    onnx = onnx_dir()
+    embedder = OnnxBgeEmbedder(onnx) if onnx else BgeEmbedder()
     dense = DenseIndex(
         db_path=INDEX_DIR, embedder=embedder,
         cache=EmbeddingCache(INDEX_DIR.parent / f"{INDEX_DIR.name}_cache.jsonl"), model_name=MODEL_NAME,

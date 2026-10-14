@@ -112,6 +112,7 @@ from mcrag.retrieval.dense import DenseIndex
 from mcrag.retrieval.frozen_pipeline import CANDIDATE_K, K, build_indexes
 from mcrag.retrieval.fusion import RRFFuser
 from mcrag.retrieval.literal import LiteralIndex
+from mcrag.retrieval.onnx_models import OnnxCrossEncoderScorer, onnx_dir
 from mcrag.retrieval.reformulation import LlmDecontextualizer
 from mcrag.retrieval.reranker import CrossEncoderReranker
 from mcrag.service.refusal import NarrowPhraseClassifier, RefusalClassifier
@@ -237,6 +238,13 @@ class AnswerPipeline:
 _default_pipeline: AnswerPipeline | None = None
 
 
+def _gate_scorer():
+    """The refusal gate's scorer: the torch cross-encoder by default, the int8
+    ONNX export when `MCRAG_ONNX_DIR` is set (see `mcrag/retrieval/onnx_models.py`)."""
+    directory = onnx_dir()
+    return OnnxCrossEncoderScorer(directory) if directory else CrossEncoderReranker()
+
+
 def get_default_pipeline() -> AnswerPipeline:
     """The process-wide singleton `answer()` uses when no pipeline is passed
     explicitly. A test that wants a fake generator or a fresh index passes
@@ -248,7 +256,7 @@ def get_default_pipeline() -> AnswerPipeline:
         _default_pipeline = AnswerPipeline(
             dense=dense, bm25=bm25, literal=literal, chunk_lookup=chunk_lookup,
             embedder=embedder, generator=generator, fuser=RRFFuser(),
-            score_pairs=CrossEncoderReranker().score_pairs,
+            score_pairs=_gate_scorer().score_pairs,
             # Task 28 / decisions/0015, at the exact configuration measured
             # there. Its own generator rather than the answer generator's:
             # a rewrite is one question, so `max_tokens=1024` would only buy

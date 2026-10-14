@@ -8,8 +8,15 @@ process. GitHub Pages cannot host it (static files only); `render.yaml` and the
 
 - **`OLLAMA_API_KEY`**, as an environment variable in the host's dashboard. It is
   not in the repo (`.env` is gitignored) and not in the image.
-- **~2 GB of RAM**: torch, `BAAI/bge-base-en-v1.5` and the MiniLM cross-encoder.
-  Free and 512 MB plans are likely to be killed at startup.
+- **RAM.** `Dockerfile` runs int8 ONNX versions of `BAAI/bge-base-en-v1.5` and the
+  MiniLM cross-encoder (`mcrag/retrieval/onnx_models.py`), loading one at a time.
+  Measured in a 512 MB container: ~175 MB at boot, ~310 MB between questions,
+  peak 480-510 MB, and one OOM kill after about ten questions. It is on the edge
+  of Render's free tier. `Dockerfile.torch` is the full-precision path and needs
+  ~2 GB.
+- **Not validated:** int8 changes scores slightly (embedding cosine vs torch
+  >= 0.991, reranker logits within ~0.1 on 10 check pairs). Retrieval quality and
+  refusal-threshold behavior have NOT been re-measured against the gold set.
 - **The data bundle** in `deploy/data/`: the 2,969 chunks and the LanceDB vector
   table the pipeline loads. It is committed because `corpus/` and `indexes/` are
   gitignored. It is a snapshot; it does not follow the maintenance job's crawl.
