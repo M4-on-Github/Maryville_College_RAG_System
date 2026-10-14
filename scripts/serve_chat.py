@@ -85,7 +85,15 @@ def build_app(warm: bool = True):
         # Load indexes and models now, not on the first visitor's question.
         from mcrag.service.answer import get_default_pipeline
 
-        get_default_pipeline()
+        pipeline = get_default_pipeline()
+        # The embedder and the reranker load on first use, not at construction,
+        # so building the pipeline alone leaves ~1.5 GB and a minute of CPU for
+        # the first visitor's question to pay -- on a small host that is a
+        # request timeout, or an out-of-memory kill mid-request. Run one real
+        # search and one rerank now, so a host that cannot hold them fails at
+        # boot, where the log says so, instead of in front of a user.
+        hits = [h for h in pipeline.search("How do I request a transcript?") if h.chunk]
+        pipeline.score_pairs([("warm up", h.chunk.text) for h in hits[:2]])
 
     token = secrets.token_urlsafe(32)
     app = create_app(settings=Settings(api_token=token, cors_origins=[]))
