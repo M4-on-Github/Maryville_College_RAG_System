@@ -439,7 +439,10 @@ const ok = (name) => { checks++; console.log("  PASS  " + name); };
   // this looks for a construction rather than the word.
   assert.ok(!/new\s+EventSource/.test(src), "EventSource is GET-only and cannot send X-API-Key");
   assert.match(src, /fetch\(ENDPOINT, \{/, "the stream must be read over fetch");
-  assert.match(src, /"x-api-key": \$\("token"\)\.value/, "the key must travel as a header");
+  // The page is keyless: the server adds the token to /ask itself
+  // (scripts/serve_chat.py), so the page must neither ask for a key nor send one.
+  assert.ok(!/id="token"/.test(HTML), "the page must not render an API key field");
+  assert.ok(!/x-api-key/i.test(src), "the page must not send an API key");
   assert.match(src, /buf\.indexOf\("\\n\\n"\)/, "frames must be split on the SSE blank line");
   // Same-origin only, deliberately: a configurable base URL would be a way to
   // make this page send its API key somewhere else.
