@@ -86,3 +86,8 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# Deployment bundle: the exact data the served pipeline loads (public site text + its
+# vector table), so a host can run without the gitignored corpus/ and indexes/.
+!deploy/data/
+!deploy/data/**

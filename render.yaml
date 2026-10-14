@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: maryville-college-rag
+    runtime: docker
+    # Two local models plus torch need roughly 2 GB of RAM; the 512 MB plans
+    # will be killed at startup. Check the current plan names and sizes.
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: OLLAMA_API_KEY
+        sync: false          # set in the Render dashboard, never in this file
+      - key: MCRAG_RATE_PER_MIN
+        value: "6"
+      - key: MCRAG_DAILY_CAP
+        value: "300"

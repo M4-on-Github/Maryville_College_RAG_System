@@ -1,0 +1,18 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Install (CPU torch, then the package)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install ".[index,scoring,service,dev]"
+      # The full suite needs the gitignored corpus and a model cache; these do not.
+      - run: python -m pytest tests/test_ratelimit.py tests/test_api.py tests/test_service.py -q
+      - run: node clients/verify_chat_client.mjs

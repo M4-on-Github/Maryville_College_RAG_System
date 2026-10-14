@@ -12,7 +12,8 @@ adds to `/ask` itself, so `create_app` and its tests are unchanged.
 
 That also means `/ask` is open to anyone who can reach this server, and every
 question spends generation quota. Bind loopback (the default) for local use;
-put a rate limit in front of it before exposing it (see docs/deploy.md).
+it is limited per client (MCRAG_RATE_PER_MIN, default 6) and per day
+(MCRAG_DAILY_CAP, default 300) -- see docs/deploy.md.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from fastapi.responses import FileResponse  # noqa: E402
 from mcrag.env import load_dotenv  # noqa: E402
 from mcrag.service.api import create_app  # noqa: E402
 from mcrag.service.config import Settings  # noqa: E402
+from mcrag.service.ratelimit import RateLimiter  # noqa: E402
 
 PAGE = ROOT / "clients" / "chat.html"
 
@@ -46,6 +48,32 @@ class _InjectKey:
         if scope["type"] == "http" and scope["path"] == "/ask":
             headers = [h for h in scope["headers"] if h[0] != b"x-api-key"]
             scope = {**scope, "headers": [*headers, self.header]}
+        await self.app(scope, receive, send)
+
+
+class _Limit:
+    """Pure ASGI middleware: refuse `/ask` with 429 once a limit is hit.
+
+    The client is the first `X-Forwarded-For` hop when a proxy set one (Render
+    does), else the socket peer. Sits outside `_InjectKey`, so a refused request
+    never reaches the pipeline.
+    """
+
+    def __init__(self, app, limiter: RateLimiter) -> None:
+        self.app, self.limiter = app, limiter
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] == "/ask":
+            headers = dict(scope["headers"])
+            forwarded = headers.get(b"x-forwarded-for", b"").decode().split(",")[0].strip()
+            client = forwarded or (scope.get("client") or ("?",))[0]
+            reason = self.limiter.check(client)
+            if reason:
+                body = ('{"detail":"%s"}' % reason).encode()
+                await send({"type": "http.response.start", "status": 429, "headers": [
+                    (b"content-type", b"application/json"), (b"retry-after", b"60")]})
+                await send({"type": "http.response.body", "body": body})
+                return
         await self.app(scope, receive, send)
 
 
@@ -67,6 +95,13 @@ def build_app(warm: bool = True):
         return FileResponse(PAGE, media_type="text/html")
 
     app.add_middleware(_InjectKey, token=token)
+    app.add_middleware(
+        _Limit,
+        limiter=RateLimiter(
+            per_minute=int(os.environ.get("MCRAG_RATE_PER_MIN", "6")),
+            daily_cap=int(os.environ.get("MCRAG_DAILY_CAP", "300")),
+        ),
+    )
     return app
 
 

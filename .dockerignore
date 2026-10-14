@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+runs
+corpus
+indexes
+tests
+.scratch
+**/__pycache__
+htmlcov
